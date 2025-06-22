@@ -1,0 +1,6 @@
+package-lock.json
+bun.*
+compiled*
+node_modules
+.vscode
+all-at-once
