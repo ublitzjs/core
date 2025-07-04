@@ -38,7 +38,7 @@ function setCSP(mainCSP, ...remove) {
   var CSPstring = "";
   for (const dir of remove) delete mainCSP[dir];
   for (var key in mainCSP)
-    CSPstring += key + " " + mainCSP[key].join(" ") + " ";
+    CSPstring += key + " " + mainCSP[key].join(" ") + "; ";
   return CSPstring;
 }
 var CSPDirs = {
