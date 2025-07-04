@@ -19,24 +19,26 @@ class HeadersMap extends Map {
     super();
     this.currentHeaders = opts;
   }
-  remove(...keys) {
-    return keys.forEach((key) => delete this.currentHeaders[key]), this;
+  remove(keys) {
+    for (const key of arguments) delete this.currentHeaders[key];
+    return this;
   }
   prepare() {
     for (const key in this.currentHeaders)
       this.set(toAB(key), toAB(this.currentHeaders[key]));
-    return (this.currentHeaders = void 0), (res) => this.toRes(res);
+    return delete this.currentHeaders, (res) => this.toRes(res);
   }
-  toRes = (res) =>
-    res.cork(() => this.forEach((value, key) => res.writeHeader(key, value)));
+  toRes(res) {
+    for (var pair of this) res.writeHeader(pair[0], pair[1]);
+    return res;
+  }
   static baseObj = helmetHeaders;
-  static default = new HeadersMap({ ...HeadersMap.baseObj }).prepare();
 }
 function setCSP(mainCSP, ...remove) {
-  var key;
   var CSPstring = "";
-  remove.forEach((dir) => delete mainCSP[dir]);
-  for (key in mainCSP) CSPstring += `${key} ${mainCSP[key].join(" ")}; `;
+  for (const dir of remove) delete mainCSP[dir];
+  for (var key in mainCSP)
+    CSPstring += key + " " + mainCSP[key].join(" ") + " ";
   return CSPstring;
 }
 var CSPDirs = {
