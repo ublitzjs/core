@@ -13,10 +13,12 @@ jobs:
         uses: actions/setup-node@v6
         with: 
           node-version: 25
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
       - name: install deps
-        run: npm i
+        run: bun install
       - name: run test
-        run: npx vitest run
+        run: bun x vitest run
   deploy:
     needs: test
     name: Deploy on npm
