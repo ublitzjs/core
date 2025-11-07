@@ -1,6 +1,6 @@
 {
   "name": "@ublitzjs/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "exports": {
     "types": "./types/index.d.ts",
     "require": "./cjs/index.cjs",
@@ -14,10 +14,10 @@
     "access": "public"
   },
   "devDependencies": {
-    "undici": "^7.10.0",
-    "esbuild": "^0.25.4",
-    "vitest": "^3.1.1",
-    "ws": "^8.18.2"
+    "undici": "^7.16.0",
+    "esbuild": "^0.25.12",
+    "vitest": "^4.0.8",
+    "ws": "^8.18.3"
   },
   "repository": {
     "type": "git",
