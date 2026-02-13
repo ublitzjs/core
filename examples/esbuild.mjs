@@ -27,7 +27,7 @@ const baseBundleOptions = {
   charset: "utf8",
   ignoreAnnotations: false,
   resolveExtensions: [".mts", ".ts", ".js", ".mjs", ".cts", ".cjs"],
-  tsconfig: "tsconfig.json", // or find another way in "tests/build.mjs" file
+  tsconfig: "tsconfig.json"
 };
 await esbuild
   .build({

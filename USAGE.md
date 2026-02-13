@@ -195,7 +195,7 @@ export default (server: Server) => {
 };
 ```
 
-Also there is HeadersMap.default (see it in the code itself), HeadersMap.baseObj (also in the code), and HeadersMap.remove (you remove unwanted headers)
+Also there is HeadersMap.default (see in the code), HeadersMap.baseObj (also in the code), and HeadersMap.remove (you remove unwanted headers)
 
 ## setCSP
 
@@ -287,9 +287,9 @@ These types add 3 methods to websocket object: sendFirstFragment, sendFragment, 
 More detailed description <a href="./types/uws-types.d.ts">here</a>
 
 ```typescript
-import type { DocumentedWSBehavior, lowHeaders } from "@ublitzjs/core";
+import type { extendApp, DocumentedWSBehavior, lowHeaders } from "@ublitzjs/core";
 import uWS from "uWebSockets.js";
-const server = uWS.App();
+const server = extendApp(uWS.App()) // better for ts
 server.ws("/*", {
   upgrade(res, req, context) {
     res.upgrade(
@@ -307,7 +307,18 @@ server.ws("/*", {
     ws.sendFragment("hello2\n");
     ws.sendLastFragment("end hello");
   },
-} as DocumentedWSBehavior<{}> as any);
+  close(ws){
+    //typed safety flag
+    ws.closed = true;
+  }
+  message(ws){
+    setTimeout(()=>{
+      //acts like res.aborted
+      if(ws.closed) return;
+      ws.send("hello")
+    }, 100);
+  },
+});
 ```
 
 # Bundling
@@ -316,4 +327,4 @@ Best efficiency and start time can be achieved if the code is bundled and minifi
 For this purpose you can use "esbuild" (at least it was tested and worked for both cjs and esm formats).<br>
 The only thing to remember: when you use it for bundling, don't forget to put "uWebSockets.js" to "external" array.<br>
 <a href="./examples/esbuild.mjs">Example 1</a><br>
-<a href="./tests/esbuild/build.mjs">Dynamic example 2</a>
+<a href="./tests/esbuild.test.ts">Dynamic example 2</a>

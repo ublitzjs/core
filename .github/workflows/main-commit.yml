@@ -1,5 +1,7 @@
 name: Test
-on: push
+on: 
+  push: 
+    branches: [main]
 jobs:
   test:
     name: Test
@@ -14,6 +16,8 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
       - name: install deps
-        run: bun install
+        run: bun ci
+      - name: build
+        run: bun run trick-tsd && bun run build
       - name: run test
-        run: bun x vitest run
+        run: bun run test

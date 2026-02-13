@@ -4,7 +4,7 @@
 import { setTimeout, clearTimeout } from "node:timers";
 import uWS from "uWebSockets.js";
 
-import { registerAbort, HeadersMap, type HttpResponse } from "@ublitzjs/core";
+import { extendApp, registerAbort, HeadersMap, type HttpResponse } from "@ublitzjs/core";
 const port = 9001;
 const stopAllEvent = Symbol();
 const setHeaders = new HeadersMap({
@@ -75,9 +75,8 @@ async function handler(res: HttpResponse) {
     res.end(resultsString);
   });
 }
-uWS
-  .App()
-  .get("/*", handler as any)
+extendApp(uWS.App())
+  .get("/*", handler)
   .listen(port, (token) => {
     if (token) console.info("Listening to port " + port);
     else console.error("Failed to listen to port " + port);

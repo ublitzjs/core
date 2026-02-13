@@ -1,6 +1,4 @@
 package-lock.json
-bun.*
-compiled*
+dist
+bun.lock
 node_modules
-.vscode
-all-at-once

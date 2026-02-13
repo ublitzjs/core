@@ -1,8 +1,23 @@
-import type { HttpResponse } from "./index";
+"use strict";
+import { toAB } from "./index.js";
+var helmetHeaders: helmetHeadersT = {
+  "X-Content-Type-Options": "nosniff",
+  "X-DNS-Prefetch-Control": "off",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "same-origin",
+  "X-Permitted-Cross-Domain-Policies": "none",
+  "X-Download-Options": "noopen",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Origin-Agent-Cluster": "?1",
+  //"Content-Security-Policy-Report-Only":"",
+  //"Strict-Transport-Security":`max-age=${60 * 60 * 24 * 365}; includeSubDomains`,
+};
 import type { HttpResponse as uwsHttpResponse } from "uWebSockets.js";
 type helmetHeadersT = {
   /**
-   *  By adding this header you can declare that your site should only load resources that have explicitly opted-in to being loaded across origins.
+   *  By adding this header you can declare that your site should only load resources that have explicitly opted-in to being loaded across origin.
    * "require-corp" LETS YOU USE new SharedArrayBuffer()
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy
    */
@@ -70,7 +85,7 @@ type helmetHeadersT = {
   /**
    *@deprecated
    * */
-  "X-XSS-Protection": string;
+  "X-XSS-Protection"?: string;
 };
 type CORSHeader = {
   /**
@@ -949,46 +964,70 @@ export type BaseHeaders = Partial<
  */
 export class HeadersMap<Opts extends BaseHeaders> extends Map {
   public currentHeaders: undefined | Opts;
-  constructor(opts: Opts);
+  constructor(opts: Opts) {
+    super();
+    this.currentHeaders = opts;
+  };
   /**
    * remove several headers from this map. Use BEFORE map.prepare(), because it will compare them by location in memory (string !== ArrayBuffer)
    * @example HeadersMap.default.remove("Content-Security-Policy", "X-DNS-Prefetch-Control", ...otherHeaders).prepare()
    */
-  remove(...keys: (keyof Opts)[]): this;
+  remove(...keys: (keyof Opts)[]): this {
+    for (const key of keys) delete this.currentHeaders![key];
+    return this;
+  }
   /**
    * last function before "going to response". It converts all strings to ArrayBuffers, so you should delete unwanted headers before it
    * @returns function, which sets all headers on the response.
    * @example
    * new HeadersMap({...HeadersMap.baseObj,"a":"a"}).remove("a").prepare();
    */
-  prepare(): (res: uwsHttpResponse) => HttpResponse;
+  prepare<T extends uwsHttpResponse>(){
+    for (const key in this.currentHeaders)
+      this.set(toAB(key), toAB(this.currentHeaders[key]!));
+    delete this.currentHeaders;
+    return (res: T) => {
+      for(var pair of this) res.writeHeader(pair[0], pair[1])
+      return res;
+    }
+  }
   /**
-   * write all static headers to response. Use AFTER map.prepare function, if you want speed.
+   * write all static headers to response. Use BEFORE map.prepare function, because this function requires "currentHeaders" object.
    * @example
    * headersMap.toRes(res);
-   * // if you want dynamic headers, use BASE:
-   * res.writeHeader(toAB(headerVariable),toAB(value))
    */
-  toRes(res: uwsHttpResponse): HttpResponse;
+  toRes<T extends uwsHttpResponse>(res: T): T{
+    var key: keyof Opts 
+    for (key in this.currentHeaders) res.writeHeader(key, this.currentHeaders![key]!);
+    return res;
+  }
 
   /**
-   * obj, containing basic headers, which u can use as a background for own headers
+   * obj, containing basic headers, which u can use as a background for own headers. It is mutable, but doing so will modify "HeadersMap.default" behavior
    * @example
    * new HeadersMap({...HeadersMap.baseObj, "ownHeader":"hello world"}).remove("X-Download-Options")
    */
-  static baseObj: helmetHeadersT;
+  static baseObj: helmetHeadersT = helmetHeaders;
   /**
-   * map with default headers
+   * this is same as "toRes", but it uses HeadersMap.baseObj
    */
-  static default: (res: uwsHttpResponse) => HttpResponse;
+  static default<T extends uwsHttpResponse>(res: T): T {
+    var key: keyof typeof HeadersMap.baseObj
+    for (key in HeadersMap.baseObj) res.writeHeader(key, HeadersMap.baseObj[key]!);
+    return res;
+  }
 }
 /**
  * This function creates Content-Security-Policy string.
  */
-export function setCSP<T extends CSP>(
-  mainCSP: T,
-  ...remove: (keyof CSP)[]
-): string;
+export function setCSP<T extends CSP>(mainCSP: T, ...remove: (keyof CSP)[]): string {
+  var CSPstring = "";
+  for (const dir of remove) delete mainCSP[dir];
+  var key: keyof T;
+  for (key in mainCSP)
+    CSPstring += (key as string) + " " + (mainCSP[key] as string[]).join(" ") + "; ";
+  return CSPstring;
+}
 type CSP = Partial<
   typeof CSPDirs & {
     /**
@@ -1073,6 +1112,24 @@ export var CSPDirs: {
    * specifies valid sources for loading media using the <audio> and <video> elements.
    */
   "media-src": string[];
+} = {
+  "default-src": ["'self'"],
+  "base-uri": ["'self'"],
+  "font-src": ["'self'"],
+  "form-action": ["'self'"],
+  "frame-ancestors": ["'none'"],
+  "img-src": ["'self'"],
+  "connect-src": ["'self'"],
+  "object-src": ["'none'"],
+  "script-src": ["'self'"],
+  "script-src-attr": ["'none'"],
+  "script-src-elem": ["'self'"],
+  "style-src": ["'self'"],
+  "style-src-attr": ["'none'"],
+  "style-src-elem": ["'self'"],
+  "trusted-types": ["'none'"],
+  "worker-src": ["'self'"],
+  "media-src": ["'self'"],
 };
 export type lowHeaders = Lowercase<
   keyof (simpleHeaders & helmetHeadersT & experimentalHeaders & CORSHeader)
