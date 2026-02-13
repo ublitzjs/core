@@ -25,4 +25,4 @@ jobs:
       - name: test
         run: bun run test
       - name: Publish to npm
-        run: bun publish
+        run: npm publish
