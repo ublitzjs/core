@@ -15,7 +15,7 @@ import type {
 } from "@ublitzjs/core"
 var runningTsd: boolean = false;
 
-export default async function(module: typeof import('@ublitzjs/core')){
+export async function runDefault(module: typeof import('@ublitzjs/core')){
   var server = module.extendApp(App(), {a: 10} as const, {b: "b"} as const);
   var port: number;
   var socket: us_listen_socket;

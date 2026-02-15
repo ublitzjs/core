@@ -1,8 +1,13 @@
-import runTests from "./all"
+import runTests from "./abstraction"
 import {createRequire} from "node:module"
-import {describe} from "vitest"
-var require = createRequire(import.meta.url)
-import * as esm from "@ublitzjs/core"
-var cjs: any = require("@ublitzjs/core")
-describe("ESM", ()=>runTests(esm))
-describe("CJS", ()=>runTests(cjs))
+var require = createRequire(import.meta.url);
+
+
+await runTests(["uWebSockets.js"], [
+  {
+    normalCJS: require("@ublitzjs/core"),
+    normalESM: await import("@ublitzjs/core"),
+    test: "runDefault",
+    name: "index.js"
+  },
+])

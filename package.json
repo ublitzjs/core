@@ -1,7 +1,13 @@
 {
   "name": "@ublitzjs/core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "types": "./dist/types/index.d.ts",
+  "files": ["dist"],
+  "typesVersions": {
+    "*": {
+      ".": ["./dist/types/index.d.ts"]
+    }
+  },
   "exports": {
     "types": "./dist/types/index.d.ts",
     "require": "./dist/cjs/index.js",
