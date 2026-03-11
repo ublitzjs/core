@@ -157,7 +157,7 @@ These types add 3 methods to websocket object: sendFirstFragment, sendFragment, 
 More detailed description <a href="./types/uws-types.d.ts">here</a>
 
 ```typescript
-import type { extendApp, DocumentedWSBehavior, lowHeaders } from "@ublitzjs/core";
+import { extendApp, type DocumentedWSBehavior, type lowHeaders } from "@ublitzjs/core";
 import uWS from "uWebSockets.js";
 const server = extendApp(uWS.App()) // better for ts
 server.ws("/*", {
