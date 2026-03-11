@@ -210,8 +210,12 @@ export async function runDefault(module: typeof import('@ublitzjs/core')){
         )
       })
     })
+    test("typedAllowHeader", ()=>{
+      var header = module.typedAllowHeader(["ws", "del", "get", "post"])
+      expect(header).toBe("DELETE, GET, POST")
+    })
   })
-  describe("route helpers", ()=>{
+  describe("deprecated route helpers", ()=>{
     it("seeOtherMethods", async ()=>{
       server.any("/seeOther", module.seeOtherMethods(["ws", "del", "get", "post"]))
       var result = await fetch(genUrl("/seeOther"))

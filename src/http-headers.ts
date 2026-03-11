@@ -1,5 +1,5 @@
 "use strict";
-import { toAB } from "./index.js";
+import { toAB, type HttpMethods } from "./index.js";
 export var helmentHeaders = {
   "X-Content-Type-Options": "nosniff",
   "X-DNS-Prefetch-Control": "off",
@@ -1192,4 +1192,22 @@ export function parseRange(range: string, maxEnd: number, maxChunk: number):
   }
   if (start! >= end || start! >= maxEnd) return { ok: false, code: "416" } as any
   return { ok: true, start: start!, end } as any
+}
+
+/**
+* This function takes methods that you registered on an endpoint and formats them to suit "Allow" header.
+* */
+export function typedAllowHeader(
+  methodsArr: HttpMethods[]
+): string {
+  if(new Set(methodsArr).size != methodsArr.length) throw new Error("the methods repeat")
+  var arr: string[] = []
+  loop: for(var method of methodsArr){
+    switch(method){
+      case "ws": continue loop;
+      case "del": arr.push("DELETE"); break;
+      default: arr.push(method.toUpperCase())
+    }
+  }
+  return arr.join(", ");
 }
