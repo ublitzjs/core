@@ -10,19 +10,12 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v5
-      - name: setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with: 
           node-version: 25
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-      - name: install deps
-        run: bun install
-      - name: build
-        run: bun run trick-tsd && bun run build
-      - name: test
-        run: bun run test
-      - name: Publish to npm
-        run: npm publish
+      - uses: oven-sh/setup-bun@v2
+      - run: bun ci 
+      - run: bun run trick-tsd && mkdir tmp && bun run build
+      - run: bun run test
+      - run: npm publish

@@ -1,231 +1,96 @@
-> some examples will be shown using typescript, all examples are esm (but can also be cjs)
-
-# Setup main file
-
-In this section each code sample will show more features, so be ready to see them one by one.
-
-## no routers or other imports
-
-### without package
-
+> Everything works for TypeScript, ESM, CJS, Bundled and minified versions with ESBuild
+# Extensions and plugins
+_index.ts_
 ```typescript
-import uWS from "uWebSockets.js";
+// this is an index.ts 
+import { extendApp } from "@ublitzjs/core"
+import { App } from "uWebSockets.js"
+import someRoutes from "./routes"
+var server = extendApp(
+    App(),
+    // extension 1, type is dynamically inferred
+    { log: console.log },
+    // another extension
+    { PORT: 9001 } 
+)
 
-const server = uWS.App();
+// thanks Fastify for motivation
+server.register(someRoutes)
 
-server.any("/*", (res, req) => {
-  // manually handle this
-  res.writeStatus("404").end("Nothing to see here!");
-});
+// every property becomes dynamically typed. No need for @ublitzjs/core to create types for your features.
+server.listen(server.PORT, (socket)=>{
+    if(socket) server.log("listening")
+    else server.log("something failed")
+})
+export type serverType = typeof server // in case you want to use that server somewhere
 
-// though I don't use "run", it is needed for example
-function run() {
-  server.listen(9001, (token) =>
-    token ? console.info("Start success") : console.error("Start failure")
-  );
+```
+_routes.ts_
+```typescript
+import type {serverType} from "./index"
+
+export default function(server: serverType) {
+    server.get("/", (res)=>res.end("ok"))
 }
-
-run();
 ```
-
-### with core package (low deps)
-
-```typescript
-import uWS from "uWebSockets.js";
-
-// c404 is an ArrayBuffer (not all codes are converted, don't worry), toAB - conversion helper
-import { c404, toAB } from "@ublitzjs/core";
-
-const server = uWS.App();
-
-var noFoundMessage = toAB("Nothing to see here!");
-server.any("/*", (res, req) => {
-  res.writeStatus(c404).end(notFoundMessage);
-});
-
-function run() {
-  server.listen(9001, (token) =>
-    token ? console.info("Start success") : console.error("Start failure")
-  );
-}
-
-run();
-```
-
-### with core package (better version)
-
-```typescript
-import uWS from "uWebSockets.js";
-
-// extendApp - lets you use or write extensions, notFoundConstructor - send 404 with a message
-import { extendApp, notFoundConstructor } from "@ublitzjs/core";
-
-// all extensions will be typed in typescript, so server.run call is also typed.
-const server = extendApp(
-  uWS.App(),
-  /* your extensions as a rest parameter. They will be bound to "server" */ {
-    run(/*for typescript*/ this: Server) {
-      this.listen(9001, (token) =>
-        token ? console.info("Start success") : console.error("Start failure")
-      );
-    },
-  } /*, you can put here as many as you want. */
-);
-
-server.any("/*", notFoundConstructor("Nothing to see here!"));
-
-// use your extension
-server.run();
-```
-
-And last example, just to show real-world use-case for extendApp
-
-```typescript
-import uWS from "uWebSockets.js";
-import { extendApp, notFoundConstructor } from "@ublitzjs/core";
-
-import { serverExtension as openapiExt } from "@ublitzjs/openapi";
-
-const server = extendApp(
-  uWS.App(),
-  // this is very basic, so for better examples - go find source repo
-  openapiExt({
-    openapi: "3.0.0",
-    info: {
-      title: "Some ublitzjs server",
-      version: "0.0.1",
-    },
-  }),
-  // your extension can also be here
-  {
-    run(this: Server) {
-      this.listen(9001, (token) =>
-        token ? console.info("Start success") : console.error("Start failure")
-      );
-    },
-  }
-);
-// this function is given by the extension
-await server.serveOpenApi("/docs", { build: false, path: "openapi.json" });
-
-server.any("/*", notFoundConstructor("Nothing to see here!"));
-
-server.run();
-```
-
-So in extendApp you put "extensions", as I call them.
-
-## With routers (mainly not @ublitzjs/router) and other imports
-
-### two modules with core package
-
-_main.js_
-
-```typescript
-import uWS from "uWebSockets.js";
-import { extendApp } from "@ublitzjs/core";
-import router from "./router.js";
-const server = extendApp(uWS.App());
-// register "plugins", not "extensions"
-server.register(router);
-server.listen(9001, () => {});
-```
-
-here you have imported your router and registered it as a plugin. So "extension" gives you NEW functionality, while "plugin" should use your current functionality
-
-_router.js_
-
-```typescript
-import type { Server } from "@ublitzjs/core";
-// for readability and
-export default (server: Server) => {
-  server.get("/simple", (res) => {
-    res.end("hello");
-  });
-};
-```
-
-### example with @ublitzjs/router
-
-_main.js_ - the same. Nothing changed at all <br>
-_router.js_
-
-```typescript
-import type { Server } from "@ublitzjs/core";
-import { Router } from "@ublitzjs/router";
-// again - better explanations in source repo.
-// Generally, router looks like OpenAPI
-const router = new Router({
-  // route
-  "/simple": {
-    // method
-    get(res) {
-      res.end("hello");
-    },
-  },
-});
-export default (server: Server) => {
-  router.bind(server).define("/simple", "get");
-};
-```
-
-So here I showed you how to setup a main file and split your code into modules
 
 # Headers
 
-## HeadersMap
-
-This class is used to convert all headers to ArrayBuffers and quickly set them on each request.
-
-```typescript
-import { HeadersMap, definePlugin, toAB, type Server } from "@ublitzjs/core";
-// init headers
-const htmlHeaders = new HeadersMap({
-  "Content-Type": "text/html",
-});
-// convert strings to ArrayBuffers -> it returns a function
-const setHeaders = htmlHeaders.prepare();
-
-export default (server: Server) => {
-  const html = toAB("<h1>Hello</h1>");
-  server.get("/", (res) => {
-    // and this function returns "res" object
-    setHeaders(res).end(html);
-  });
-};
-```
-
-Also there is HeadersMap.default (see in the code), HeadersMap.baseObj (also in the code), and HeadersMap.remove (you remove unwanted headers)
-
-## setCSP
-
-Creates a string of CSP, using array parameters.
+In previous versions there was a "HeadersMap" which used to convert all non-changing headers into ArrayBuffer instances, however the benefit was too little, so now it is deprecated. The main overhead for headers turned out to come from "res.writeHeader". So instead of writing one header pair in each call, it is better to write several ones in one using CRLF. While it is faster, it is less safe and looks frightening. So when http headers don't change, you can use beautiful "staticHeaders"
+Also there is _lowHeaders_, _setCSP_, typed _res.writeHeader_, typed _req.getHeader + lowHeaders_, _parseRange_ (mainly used with @ublitzjs/static). You can explore more, as there many exported types for headers with full descriptions and internet links
 
 ```typescript
-// in response (not recommended)
-res.writeHeader(
-  "Content-Security-Policy",
-  setCSP({ "default-src": ["'self'"] })
-);
-// in HeadersMap
-import { setCSP, HeadersMap, /*basic settings*/ CSPDirs } from "@ublitzjs";
-new HeadersMap({
-  "Content-Security-Policy": setCSP(
-    {
-      ...CSPDirs,
-      "connect-src": ["'self'", "https://example.com"],
-    },
-    /*remove directives in a rest param*/
-    "img-src",
-    "object-src"
-  ),
-}).prepare();
+import { staticHeaders, extendApp, setCSP, type lowHeaders, parseRange } from "@ublitzjs/core"
+import { App } from "uWebSockets.js"
+
+var server = extendApp(App())
+
+//if all headers don't change, typeof headers == "string"
+var headers = staticHeaders({
+  // headers are typed,
+  "Content-Type": "text/plain", 
+
+  // again, typed header + typed CSP directives
+  "Content-Security-Policy": setCSP({
+    "connect-src": ["'self'"],
+    "worker-src": ["'self'"]
+  })
+
+}, "Etag") // However "Etag" doesn't have value yet
+
+// you can also use staticHeaders({...helmetHeaders, "Content-Type": "text/plain"}, "ETag") for usage with default helmet headers
+var littleFasterHeaders = Buffer.from(headers)
+server.get("/", (res, req)=>{
+    
+
+  // we put ETag's value to the right. This way we can combine static + dynamic headers in one single call  
+  res.writeHeader(littleFasterHeaders, 'W/"' + 123 + '"')  
+
+  // underneath this is the same (gain speed but lose TypeScript. Not bad if your head is a compiler or you write tests)
+  res.writeHeader(
+    "Content-Type: text/plain\r\nETag",
+    'W/"' + 123 + '"'
+  )
+
+  // you can make right side look same as well, but have to switch off validation with <string>
+  res.writeHeader<string>(
+    "Content-Type",
+    'text/plain\r\nETag: W/"' + 123 + '"'
+  )
+
+  // get headers with lowHeaders, so that "range" is proposed by LSP (no need to be explicit, this is here by default). You can still use Buffer/ArrayBuffer
+  var rangeHeader = req.getHeader<lowHeaders>("range")
+  if(rangeHeader) {
+    // max send 50 bytes, last byte is at index 100
+    const parsedRange = parseRange(rangeHeader, 100, 50)
+    if(parsedRange.ok) {
+      console.log(parsedRange.start, parsedRange.end)
+    } else console.log(parsedRange.code) // "400" or "416"
+  }
+  res.end("ok")  
+})
+
 ```
-
-## lowHeaders
-
-Greatly fits when you need to use request.getHeader("sec-websocket-extensions"), but miss a letter or two. <br>
-See example below in "uWS types / DocumentedWS and DocumentedWSBehavior"
 
 # registerAbort
 
@@ -234,15 +99,21 @@ Emitter used here is "tseep", which is faster than node:events.
 
 ```typescript
 import type { HttpResponse } from "@ublitzjs/core";
-function myOnAbort(res: HttpResponse) {
-  res.emitter.once("abort", () => {
-    /*do something*/
-  });
+function someHeavyHandler(res: HttpResponse) {
+  console.log("I DO SOMETHING LARGE, LIKE STREAMING VIDEO")
+  return new Promise<boolean>((resolve)=>{
+    res.emitter.once("abort", () => {
+      /*close file descriptor*/
+      resolve(false);
+    });
+    setTimeout(()=>{
+      if(!res.aborted) { console.log("HAVE SENT FILE"); resolve(true) }
+    }, 1000)
+  })
 }
 server.get("/", (res) => {
-  // use it
   registerAbort(res);
-  console.log(/*added on the response*/ res.aborted, res.emitter);
+  console.log(/*added on the response*/ res.emitter);
 
   res.emitter.once("abort", () => {
     console.log("ABORTED");
@@ -250,17 +121,16 @@ server.get("/", (res) => {
     stopDatabaseTransaction();
   });
 
-  myOnAbort();
-  /*here you something*/
+  // easily cleans up if aborted
+  var haveSentFile = await someHeeavyHandler(res);
 });
 ```
 
-It is heavily used in @ublitzjs/req-body and @ublitzjs/static to stop file streams
-If you want a more interesting use-case, <a href="./examples/AsyncFunction.mts">Go here</a>
+It is heavily used in @ublitzjs/static to stop file streams
 
-# uWS types
+# TypeScript support
 
-Another benefit of using this package are additional typescript docs for uWS, that they haven't added yet (I mean index.d.ts has no description yet).
+Another benefit of using this package are additional typescript docs (and some for uWS, that they haven't added yet)
 
 ## DeclarativeResponse
 
@@ -268,10 +138,10 @@ This class helps you define faster and more optimized controllers, because they 
 
 Instead of sending response dynamically each time with <code>res.end()</code> you generate the whole response with all headers and body right on the start of the application.<br>
 
-It is not something, that ublitzjs created (only <code>.writeHeaders</code> method), but rather just description it gives you with the class
+It is not something, that µBlitz.js created (only <code>.writeHeaders</code> method), but rather just description it gives you with the class
 
 ```typescript
-import { DeclarativeResponse } from "@ublitzjs";
+import { DeclarativeResponse } from "@ublitzjs/core";
 server.get(
   "/fast-response",
   new Declarative()
@@ -282,7 +152,7 @@ server.get(
 ```
 
 ## DocumentedWS and DocumentedWSBehavior
-
+> soon these types will be present in the very uWS
 These types add 3 methods to websocket object: sendFirstFragment, sendFragment, sendLastFragment.<br>
 More detailed description <a href="./types/uws-types.d.ts">here</a>
 
@@ -324,7 +194,5 @@ server.ws("/*", {
 # Bundling
 
 Best efficiency and start time can be achieved if the code is bundled and minified.<br>
-For this purpose you can use "esbuild" (at least it was tested and worked for both cjs and esm formats).<br>
+For this purpose you can use "ESbuild" (at least it was tested and it worked for both cjs and esm).<br>
 The only thing to remember: when you use it for bundling, don't forget to put "uWebSockets.js" to "external" array.<br>
-<a href="./examples/esbuild.mjs">Example 1</a><br>
-<a href="./tests/esbuild.test.ts">Dynamic example 2</a>

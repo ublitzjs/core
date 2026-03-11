@@ -1,5 +1,5 @@
 "use strict";
-import type { BaseHeaders, lowHeaders } from "./http-headers.js";
+import type { BaseHeaders, lowHeaders, RequiredBaseHeaders } from "./http-headers.js";
 import uWS from "uWebSockets.js";
 import { Buffer } from "node:buffer";
 import { EventEmitter } from "tseep";
@@ -21,7 +21,12 @@ import type {
 
 /**
  * function to effortlessly mark response as aborted AND to attach an event emitter, so that you can easily scale the handler. If you don't need event emitter and only some res.aborted - set it by yourself (no overkill for the handler)
+ * If some utility expect import("@ublitzjs/core").HttpResponse, it means that they response to first go through this registerAbort
  * @param res
+ * @example
+ * console.log(Boolean(res.emitter)) // false
+ * registerAbort(res)
+ * console.log(Boolean(res.emitter)) // true
  */
 export function registerAbort(res: uwsHttpResponse): HttpResponse {
   if (typeof res.aborted === "boolean")
@@ -125,26 +130,47 @@ export interface HttpResponse<UserDataForWS = {}>
    */
   collect: (...any: any[]) => any;
   /**
-   * An event emitter, which lets you subscribe several listeners to "abort" event OR your own events, defined with Symbol().
+   * An event emitter, which lets you subscribe several listeners to "abort" event OR your own events, defined with Symbol() | other string
+   * @example
+   * res.emitter.once("abort", ()=>{
+   *   console.log("I have to clean up some random file descriptor")
+   *   // do cleanup
+   * })
    */
   emitter: EventEmitter<{
     abort: () => void;
     [k: symbol]: (...any: any[]) => void;
   }>;
   /**
-   * changes when res.onAborted fires.
+   * changes when res.onAborted fires (you have to use registerAbort for this)
    */
   aborted?: boolean;
   /**
    * You should set it manually when ending the response. Particularly useful if some error has fired and you are doubting whether res.aborted is a sufficient flag.
+   * @example
+   * function endResponse(res) {
+   *   if(res.aborted) return;
+   *   res.end("alright")
+   *   res.finished = true;
+   * }
    */
   finished?: boolean;
+  /**
+  * Writes key and value to HTTP response. See writeStatus and corking.
+  * It can actually write several values in a row, just be careful with string concatenation. If headers never change - use staticHeaders (and save typescript safety)
+  * @example
+  * res.writeHeader("Content-Type", "text/plain").writeHeader("Accept-Ranges", "bytes")
+  * // and a faster trick
+  * res.writeHeader("Content-Type: text/plain\r\nAccept-Ranges", "bytes")
+  * */
+  writeHeader<Key extends keyof RequiredBaseHeaders | Omit<RecognizedString, string> | (string & {})>(key: Key, val: Key extends keyof RequiredBaseHeaders ? RequiredBaseHeaders[Key] : RecognizedString): HttpResponse;
 }
 /**This HttpRequest is same as original uWS.HttpRequest, but getHeader method is typed for additional tips
  * @example
  * import {lowHeaders} from "@ublitzjs/core"
- * // some handler later
+ * // some handler later (not compulsory to specify lowHeaders. It is a default behaviour)
  * req.getHeader<lowHeaders>("content-type")
+ *
  */
 export interface HttpRequest extends uwsHttpRequest {
   getHeader<T extends RecognizedString = lowHeaders>(a: T): string;
@@ -205,8 +231,9 @@ export function extendApp<T extends object[]>(
   for (const extension of rest) Object.assign(app, extension);
   return app as any;
 }
+
 /**
- * conversion to ArrayBuffer ('cause transferring strings to uWS is really slow)
+ * @deprecated this conversion to arrayBuffer is not really necessary. You just have Buffer.from(""). Slicing that is rarely needed, and even if it is, that takes 4 lines of code
  */
 export function toAB(data: Buffer | string): ArrayBuffer {
   var NodeBuf = data instanceof Buffer ? data : Buffer.from(data);
@@ -331,6 +358,9 @@ export interface DocumentedWSBehavior<UserData> {
     context: us_socket_context_t
   ) => void | Promise<void>;
 }
+/**
+* let's believe, that in 20.61.0+ versions we get writeStatus.
+* */
 export type DeclarativeResType = {
   writeHeader(key: string, value: string): DeclarativeResType;
   writeQueryValue(key: string): DeclarativeResType;

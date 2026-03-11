@@ -1,4 +1,5 @@
 import {describe, it, expect, test, afterAll} from "vitest"
+import testParseRange from "./parseRange"
 import WebSocket from "ws"
 import { App,
   us_listen_socket_close,
@@ -7,11 +8,12 @@ import { App,
   us_socket_local_port 
 } from "uWebSockets.js"
 import {expectError, expectType} from "tsd"
-import type {
-  onlyHttpMethods,
-  routeFNOpts,
-  HttpResponse,
-  lowHeaders
+import {
+  type onlyHttpMethods,
+  type routeFNOpts,
+  type HttpResponse,
+  type lowHeaders,
+  toAB
 } from "@ublitzjs/core"
 var runningTsd: boolean = false;
 
@@ -132,31 +134,82 @@ export async function runDefault(module: typeof import('@ublitzjs/core')){
     expect(response.headers.get("Allow")).toBe("Get")
     expect(await response.text()).toBe(basicResponse)
   })
-  test("HeadersMap", async()=>{
-    var writeHeaders = module.HeadersMap.default
-    server.get("/headers/default", (res) => {
-      writeHeaders(res).end("hello")
+  describe("advanced headers", () => {
+    it("deprecated HeadersMap", async () => {
+      var writeHeaders = module.HeadersMap.default
+      server.get("/headers/default", (res) => {
+        writeHeaders(res).end("hello")
+      })
+      async function check() {
+        var response = await fetch(genUrl("/headers/default"))
+        expect(response.headers.get("x-download-options")).toBe("noopen")
+      }
+      var headers = new module.HeadersMap(module.HeadersMap.baseObj)
+      writeHeaders = headers.toRes.bind(headers);
+      await check();
+      writeHeaders = headers.prepare();
+      expect(headers.currentHeaders).toBeUndefined()
+      await check();
+      // it is typed for uWS and uBlitz.js equally
+      if (runningTsd) {
+        var a: any;
+        expectType<uwsHttpResponse>(writeHeaders(a as uwsHttpResponse))
+        expectType<HttpResponse<{}>>(writeHeaders(a as HttpResponse))
+        type userRes = HttpResponse<{ id: number }> & { userKey: string }
+        expectType<userRes>(writeHeaders(a as userRes))
+        // but it accepts only response object
+        expectError(writeHeaders(a as number))
+      }
     })
-    async function check() {
-      var response = await fetch(genUrl("/headers/default"))
-      expect(response.headers.get("x-download-options")).toBe("noopen")
-    }
-    var headers = new module.HeadersMap(module.HeadersMap.baseObj)
-    writeHeaders = headers.toRes.bind(headers);
-    await check();
-    writeHeaders = headers.prepare();
-    expect(headers.currentHeaders).toBeUndefined()
-    await check();
-    // it is typed for uWS and uBlitz.js equally
-    if(runningTsd){
-      var a: any;
-      expectType<uwsHttpResponse>(writeHeaders(a as uwsHttpResponse))
-      expectType<HttpResponse<{}>>(writeHeaders(a as HttpResponse))
-      type userRes = HttpResponse<{id: number}> & {userKey: string}
-      expectType<userRes>(writeHeaders(a as userRes))
-      // but it accepts only response object
-      expectError(writeHeaders(a as number))
-    }
+    it("typed headers of request and response objects", () => {
+      server.any("/headers", (res, req) => {
+        expectError(req.getHeader<"content-type">("not content type"))
+        expectError(res.writeHeader("Content-Type", ""))
+        //ok
+        res.writeHeader("Content-Type", "application/json")
+        // allows custom headers
+        res.writeHeader("own header", "own data")
+        var header = toAB("ab")
+        var val = toAB("val")
+        // can work with default uWS types
+        res.writeHeader(header, val)
+      })
+    })
+    it("CRLF manipulations (I DIDN'T LIE)", async () => {
+      server.get("/CRLF", (res) => {
+        // left-side crlf works
+        res.writeHeader("one: 1\r\ntwo: 2\r\nthree", "3")
+        // right-side crlf works
+        res.writeHeader("four", "4\r\nfive: 5").end("ok")
+      })
+      var result = await fetch(genUrl("/CRLF"))
+      var headers = Object.fromEntries(result.headers.entries())
+      delete headers.date
+      delete headers.uwebsockets
+      expect(headers).toEqual({
+        one: "1", two: "2", three: "3", four: "4", five: "5", "content-length": "2"
+      })
+    })
+    describe("staticHeaders", ()=>{
+      it("returns type of the last param", ()=>{
+        expectType<"Accept-Ranges">(module.staticHeaders({}, "Accept-Ranges"))
+      })
+      it("has validation inside first param", ()=>{
+        expectError(module.staticHeaders({ "Content-Type": "application:json" }, "Accept-Ranges"))
+      })
+      it("accepts own headers inside first param", ()=>{
+        expectType<"ABCD">(module.staticHeaders({ "own": "own" }, "ABCD"))
+      }) 
+      it("works", ()=>{
+        expect(
+          module.staticHeaders({
+            "Content-Type": "text/plain", "Content-Range": "bytes 0-999/1000" 
+          }, "Accept-Ranges")
+        ).toBe(
+          "Content-Type: text/plain\r\nContent-Range: bytes 0-999/1000\r\nAccept-Ranges"
+        )
+      })
+    })
   })
   describe("route helpers", ()=>{
     it("seeOtherMethods", async ()=>{
@@ -218,7 +271,7 @@ export async function runDefault(module: typeof import('@ublitzjs/core')){
     var result = await fetch(genUrl("/abort"), {signal: control.signal}).catch(()=>false)
     expect(result === false).toBe(true)
   })
-
+  testParseRange(module.parseRange)
   test("websockets", async ()=>{
     var client: WebSocket
 

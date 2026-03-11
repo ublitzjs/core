@@ -1,6 +1,6 @@
 "use strict";
 import { toAB } from "./index.js";
-var helmetHeaders: helmetHeadersT = {
+export var helmentHeaders = {
   "X-Content-Type-Options": "nosniff",
   "X-DNS-Prefetch-Control": "off",
   "X-Frame-Options": "DENY",
@@ -11,11 +11,9 @@ var helmetHeaders: helmetHeadersT = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
   "Origin-Agent-Cluster": "?1",
-  //"Content-Security-Policy-Report-Only":"",
-  //"Strict-Transport-Security":`max-age=${60 * 60 * 24 * 365}; includeSubDomains`,
-};
+} as const satisfies helmetHeadersT
 import type { HttpResponse as uwsHttpResponse } from "uWebSockets.js";
-type helmetHeadersT = {
+export type helmetHeadersT = {
   /**
    *  By adding this header you can declare that your site should only load resources that have explicitly opted-in to being loaded across origin.
    * "require-corp" LETS YOU USE new SharedArrayBuffer()
@@ -87,7 +85,7 @@ type helmetHeadersT = {
    * */
   "X-XSS-Protection"?: string;
 };
-type CORSHeader = {
+export type CORSHeader = {
   /**
    * The HTTP Access-Control-Allow-Credentials response header tells browsers whether the server allows credentials to be included in cross-origin HTTP requests.
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Access-Control-Allow-Credentials
@@ -134,7 +132,7 @@ type CORSHeader = {
    */
   "Access-Control-Request-Method": string;
 };
-type experimentalHeaders = {
+export type experimentalHeaders = {
   /**
    * @experimental
    * The HTTP Attribution-Reporting-Eligible request header indicates that the corresponding response is eligible to register an attribution source or trigger.
@@ -389,7 +387,7 @@ The HTTP Speculation-Rules response header provides one or more URLs pointing to
    * */
   "Use-As-Dictionary": string;
 };
-type simpleHeaders = {
+export type simpleHeaders = {
   /**
    * indicates which content types, expressed as MIME types, the sender is able to understand
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Accept
@@ -560,7 +558,7 @@ Only the value form-data, as well as the optional directive name and filename, c
 It should only be included in 206 Partial Content or 416 Range Not Satisfiable responses.
 @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Range
    */
-  "Content-Range": string;
+    "Content-Range": `bytes ${number}-${number}/*` | `bytes ${number}-${number}/${number}` | `bytes */${number}`;
   /**
    * The HTTP Content-Security-Policy response header allows website administrators to control resources the user agent is allowed to load for a given page.
    *
@@ -583,7 +581,7 @@ The CSP report-to directive must be specified for reports to be sent: if not, th
    * You know this one. It is "text/html" or "video/mp4" or whatever
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Type
    */
-  "Content-Type": string;
+  "Content-Type": `${string}/${string}` | `${string}/${string}; ${string}`;
   /**
    * The HTTP Cookie request header contains stored HTTP cookies associated with the server (i.e., previously sent by the server with the Set-Cookie header or set in JavaScript using Document.cookie)
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cookie
@@ -606,7 +604,7 @@ The CSP report-to directive must be specified for reports to be sent: if not, th
    * https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag
    * */
 
-  Etag: string;
+  Etag: `W/"${string}"` | `"${string}"`;
   /**
    *The HTTP Expect request header indicates that there are expectations that need to be met by the server in order to handle the complete request successfully.
 
@@ -650,7 +648,7 @@ The value 0 is used to represent a date in the past, indicating the resource has
    * The HTTP If-Match request header makes a request conditional. A server will return resources for GET and HEAD methods, or upload resource for PUT and other non-safe methods, only if the resource matches one of the ETag values in the If-Match request header. If the conditional does not match, the 412 Precondition Failed response is returned instead.
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-Match
    * */
-  "If-Match": string;
+  "If-Match": `W/"${string}"`|`"${string}"` | "*";
   /**
  * The HTTP If-Modified-Since request header makes a request conditional. The server sends back the requested resource, with a 200 status, only if it has been modified after the date in the If-Modified-Since header. If the resource has not been modified since, the response is a 304 without any body, and the Last-Modified response header of the previous request contains the date of the last modification.
 
@@ -780,7 +778,7 @@ Several parts can be requested at the same time in one Range header, and the ser
 If the server sends back ranges, it uses the 206 Partial Content status code for the response. If the ranges are invalid, the server returns the 416 Range Not Satisfiable error.
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Range
 * */
-  Range: string;
+  Range: `bytes=${number}-${number}` | `bytes=${number}-` | `bytes=-${number}`;
   /**
    * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referer
    * */
@@ -956,11 +954,40 @@ export type BaseHeaders = Partial<
     experimentalHeaders &
     CORSHeader & { [key: string]: string }
 >;
+
 /**
- * A map containing all headers as ArrayBuffers, so speed remains. There are several use cases of it:
- * 1) Don't define them in requests ( post(res){new HeadersMap({...headers}).prepare().toRes(res)} ). This is slow. Define maps BEFORE actual usage.
- * 2) You can pass them in LightMethod or HeavyMethod in shared property (but handle it manually)
- * 3) Don't define them before writing status on request. uWebSockets.js after first written header considers response as successful and puts "200" code automatically. Set headers AFTER validation in class controllers (handler function) and after writing status (or don't write it at all. It will be 200).
+* This function is created as a replacement for "HeadersMap" (which became deprecated in 1.1.0).  
+* The most overhead when sending request doesn't come from utf16 -> utf8 conversion, but from many subsequent res.writeHeader, which is JS->C++ switch.  
+* To reduce an amount of calling headers, you can use manual string concatenation and HTTP header separator - CRLF.  
+* @notice this function doesn't create completely ready data to send. Look a the example below
+* @notice2 its return-type LIES. In fact it is just a concatenated string, but TS lies just for LSP help for the second param and, as a result, last header, value to which should be written in res.writeHeader
+* @example
+* //if all headers don't change
+* var headers = staticHeaders({
+*   "Content-Type": "text/plain"
+* }, "Etag") // However "Etag" doesn't have value yet
+* * var littleFasterHeaders = Buffer.from(headers)
+* server.get("/", (res)=>{
+*   // we put ETag's value to the right. This way we can combine static + dynamic headers in one single call
+*   res.writeHeader(littleFasterHeaders, 'W/"' + 123 + '"')
+*   res.end("ok")
+*
+*  // underneath this is the same (gain speed but lose TypeScript. Not bad if your head is a compiler)
+*  res.writeHeader("Content-Type: text/plain\r\nETag", 'W/"' + 123 + '"')
+*  // you can make right side look same as well
+*  res.writeHeader<string>("Content-Type", 'text/plain\r\nETag: W/"' + 123 + '"')
+* })
+* 
+* */
+export function staticHeaders<T extends keyof RequiredBaseHeaders | (string & {})>(headers: BaseHeaders, likelyDynamicHeader: T): T {
+  var result = ""
+  for(var key in headers) { result+=key + ": "+headers[key] + "\r\n" }
+  return (result += likelyDynamicHeader) as any
+}
+
+/**
+ * @deprecated because using ArrayBuffers vs strings in headers doesn't bring much benefit, as it turned out after some benchmarks (+ it uses Map class, so that's even slower). It is going to be removed in 2.0.0. When is it coming? Who knows.  
+ * And YES, I removed description of it. Stick to "staticHeaders" or CRLF manipulations
  */
 export class HeadersMap<Opts extends BaseHeaders> extends Map {
   public currentHeaders: undefined | Opts;
@@ -1007,7 +1034,7 @@ export class HeadersMap<Opts extends BaseHeaders> extends Map {
    * @example
    * new HeadersMap({...HeadersMap.baseObj, "ownHeader":"hello world"}).remove("X-Download-Options")
    */
-  static baseObj: helmetHeadersT = helmetHeaders;
+  static baseObj: helmetHeadersT = helmentHeaders;
   /**
    * this is same as "toRes", but it uses HeadersMap.baseObj
    */
@@ -1040,8 +1067,6 @@ type CSP = Partial<
  * Usual CSP directories. If you want more dirs:
  * 1) I will put more in soon
  * 2) use string concatenation (use BASE)
- * @example
- * new HeadersMap({...HeadersMap.baseObj, "Content-Security-Policy":setCSP({...CSPDirs}) + " your-dir: 'self';"})
  */
 export var CSPDirs: {
   /**
@@ -1131,6 +1156,40 @@ export var CSPDirs: {
   "worker-src": ["'self'"],
   "media-src": ["'self'"],
 };
+export type RequiredBaseHeaders = (simpleHeaders & helmetHeadersT & experimentalHeaders & CORSHeader)
 export type lowHeaders = Lowercase<
-  keyof (simpleHeaders & helmetHeadersT & experimentalHeaders & CORSHeader)
+  keyof RequiredBaseHeaders
 >;
+var badRange = {ok:false,code:"400"} as const
+/**
+* "Range" http header requires validation, so here you get it
+* @example
+* var data = Buffer.allocUnsafe(1024*1024)
+* server.get("/largeData", (res, req)=>{
+*   var range = req.getHeader("range")
+*   if(!range) return res.end(data)
+*   // so parseRange might modify "range" to suit requirements + check if header is right
+*   var parsedRange = parseRange(range, data.length - 1, 64*1024)
+*   // might be 
+*   if(!parsedRange.ok) return res.writeStatus(parsedRange.code).end("bad")
+* })
+* */
+export function parseRange(range: string, maxEnd: number, maxChunk: number):
+  { ok: false; code: "400" | "416" } | { ok: true; start: number; end: number } {
+  if (range.length == 7 || range.slice(0, 6) != "bytes=") return badRange as any;
+  var dash = range.indexOf("-", 6);
+  if (dash == -1) return badRange as any
+  var start = dash == 6 ? undefined : Number(range.slice(6, dash))
+  if (Number.isNaN(start)) return badRange as any
+  var end = range.length == dash + 1 ? undefined : Number(range.slice(dash + 1))
+  if (Number.isNaN(end)) return badRange as any
+
+  if (end === undefined) {
+    end = maxChunk ? Math.min(start! + maxChunk, maxEnd) : maxEnd;
+  } else if (start === undefined) {
+    start = maxEnd - end;
+    end = maxEnd;
+  }
+  if (start! >= end || start! >= maxEnd) return { ok: false, code: "416" } as any
+  return { ok: true, start: start!, end } as any
+}

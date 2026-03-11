@@ -1,29 +1,33 @@
 "use strict";
+/**
+* Yes, I have just deprecated the whole category. It will be completely removed in 2.0.0. When is it coming? Who knows
+* */
+
+
+
 import { toAB } from "./index.js";
-var c405Message = toAB("Method is not allowed");
-var allowHeader = toAB("Allow");
-var checkHeader = toAB("content-length");
-var checkMessage = toAB("Content-Length is required to be > 0 and to be an integer");
 import type { HttpResponse as uwsHttpResponse } from "uWebSockets.js";
 import type { HttpRequest, HttpMethods } from "./index.ts";
 /**
- * If something wrong is to content-length, sends 411 code and throws error with a "cause" == { CL : string}, sets res.finished = true
+ * @deprecated
+ * uWS actually checks content-length by itself
  */
 export function checkContentLength(
   res: uwsHttpResponse,
   req: HttpRequest
 ): number {
-  var header = req.getHeader(checkHeader);
+  var header = req.getHeader("content-length");
   var CL: number;
   if (!header || !Number.isInteger(CL = Number(header))) {
     res.finished = true;
-    res.cork(() => res.writeStatus(c411).end(checkMessage));
+    res.cork(() => res.writeStatus("411").end("Content-Length is required to be > 0 and to be an integer"));
     throw new Error("Wrong content-length", { cause: { CL: header} });
   }
   return CL;
 }
 /**
- * sends http 400 and throws an Error with "causeForYou", sets res.finished = true
+ * @deprecated
+ * This function throws, so it is slow. 
  */
 export function badRequest(
   res: uwsHttpResponse,
@@ -31,20 +35,20 @@ export function badRequest(
   causeForYou: string
 ): void {
   res.finished = true;
-  if (!res.aborted) res.cork(() => res.writeStatus(c400).end(toAB(error)));
+  if (!res.aborted) res.cork(() => res.writeStatus("400").end(toAB(error)));
   throw new Error("Bad request", { cause: causeForYou });
 }
 /**
- * sends http 413, but doesn't throw an Error, sets res.finished = true
+ * @deprecated
+ * These are 2 lines of code. 
  */
 export function tooLargeBody(res: uwsHttpResponse, limit: number): void {
-  var message = toAB("Body is too large. Limit in bytes - " + limit);
-  if (!res.aborted) res.cork(() => res.writeStatus(c413).end(message));
+  if (!res.aborted) res.cork(() => res.writeStatus("413").end("Body is too large. Limit in bytes - " + limit));
   res.finished = true;
 }
 /**
- * Constructs function, which sends http 405 and sets http Allow header with all methods you passed.
- * It ignores "ws" and replaces "del" on "DELETE"
+ * @deprecated
+ * use "typedAllowHeader" instead
  */
 export function seeOtherMethods(
   methodsArr: HttpMethods[]
@@ -60,35 +64,40 @@ export function seeOtherMethods(
   }
   var methods = toAB(arr.join(", "));
   return (res) =>
-    res.writeStatus(c405).writeHeader(allowHeader, methods).end(c405Message);
+    res.writeStatus("405").writeHeader("Allow", methods).end("Method is not allowed");
 }
-
 /**
- * Constructs the function, which sets 404 http code and sends the message you have specified
+ * @deprecated 
+ * This is 1-2 lines of code
  */
 export function notFoundConstructor(
   message: string = "Not found"
 ): (res: uwsHttpResponse, req: any) => any {
   var mes = toAB(message);
-  return (res) => res.writeStatus(c404).end(mes, true);
+  return (res) => res.writeStatus("404").end(mes, true);
 }
 /**
+ * @deprecated
  * code: required content length
  */
 export var c411 = toAB("411");
 /**
+ * @deprecated
  * code: bad request
  */
 export var c400 = toAB("400");
 /**
+ * @deprecated
  * code: payload too large
  */
 export var c413 = toAB("413");
 /**
+ * @deprecated
  * code: method not allowed
  */
 export var c405 = toAB("405");
 /**
+ * @deprecated
  * code: not found
  */
 export var c404 = toAB("404");

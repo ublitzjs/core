@@ -10,11 +10,13 @@ On NPM you can find such packages: (with @ublitzjs/ organization)
 - static (send files)
 - payload (handling POST-like requests)
 - router (OpenAPI-like router for simple orientation)
-- openapi
+- openapi 
 - preprocess (Code preprocessing + templating framework)
 - asyncapi
 - testing (coming soon)
 - auth (coming soon)
+
+The ones having version < 1.0.0 are unstable.
 
 # Installation
 
