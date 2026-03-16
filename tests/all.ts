@@ -17,7 +17,7 @@ import {
 } from "@ublitzjs/core"
 var runningTsd: boolean = false;
 
-export async function runDefault(module: typeof import('@ublitzjs/core')){
+export async function testIndex(module: typeof import('@ublitzjs/core')){
   var server = module.extendApp(App(), {a: 10} as const, {b: "b"} as const);
   var port: number;
   var socket: us_listen_socket;
@@ -320,6 +320,58 @@ export async function runDefault(module: typeof import('@ublitzjs/core')){
       client.on("message", function(data) {
         expect(data.toString()).toBe("hello1\n hello2\n end hello")
         client.send("hello")
+      })
+    })
+  })
+}
+
+export function testChannel(module: typeof import("@ublitzjs/core/events")) {
+  describe("Channel", ()=>{
+    var Channel = module.default
+    describe("at least", ()=>{
+      it("is typed", () => {
+        if (runningTsd) {
+          type MessageT = { msg: string }
+          let ch = new Channel<MessageT>()
+          let cb = (data: string) => { data; }
+          expectError(ch.sub(cb))
+          var goodCb = (data: MessageT) => { data; }
+          ch.sub(goodCb)
+          expectError(ch.unsub(cb))
+          ch.unsub(goodCb)
+          expectError(ch.pub(""))
+          ch.pub({ msg: "" })
+        }
+      })
+
+      var ch = new Channel<number>();
+      let cb1X = 0;
+      let cb2X = 0;
+      let cb3X = 0;
+      let cb1 = (i: number)=>{cb1X+=i}
+      let cb2 = (i: number)=>{cb2X+=i}
+      let cb3 = (i: number)=>{cb3X+=i}
+      function regAll() { ch.sub(cb1); ch.sub(cb2); ch.sub(cb3); }
+      it("publishes messages repeatedly", ()=>{
+        regAll()
+        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([10, 10, 10])
+        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
+      })
+      it("removes listeners individually", ()=>{
+        expect((cb1 as any).id).toBe(0)
+        expect((cb2 as any).id).toBe(1)
+        expect((cb3 as any).id).toBe(2)
+        ch.unsub(cb2); ch.unsub(cb1); ch.unsub(cb3); 
+        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
+      })
+      it("removes all listeners", ()=>{
+        regAll(); ch.clear(); 
+        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
+      })
+      it("supports one-time listeners", ()=>{
+        ch.sub(cb1, true); ch.sub(cb2, true); ch.sub(cb3, true)
+        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([30, 30, 30])
+        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([30, 30, 30])
       })
     })
   })
