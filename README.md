@@ -41,3 +41,6 @@ But the "speed" of creating your app comes from so-called "abstractions". Their 
 Though it IS performant, it handles only core features. Now there are solutions like "hyper-express", "ultimate-express", "uwebsockets-express", but they are just additional layers simulating "express" behaviour, while hiding the most important (and difficult) aspects of uWS.<br>
 
 This library provides you with utilities but you still operate on the uWebSockets.js. This way server remains optimizable and rapid typing doesn't vanish.
+
+# New feature - "Channel". In other words, "another event emitter".
+Channel proved to be the fastest among tseep, cozyevent and node:events. It is cross-platform and can be used with/without main µBlitz.js ecosystem. Import it using "@ublitzjs/core/channel"

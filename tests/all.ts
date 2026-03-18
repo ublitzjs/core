@@ -1,13 +1,14 @@
-import {describe, it, expect, test, afterAll} from "vitest"
+import { describe, it, expect, test, afterAll } from "vitest"
 import testParseRange from "./parseRange"
 import WebSocket from "ws"
-import { App,
+import {
+  App,
   us_listen_socket_close,
   type HttpResponse as uwsHttpResponse,
   type us_listen_socket,
-  us_socket_local_port 
+  us_socket_local_port
 } from "uWebSockets.js"
-import {expectError, expectType} from "tsd"
+import { expectError, expectType } from "tsd"
 import {
   type onlyHttpMethods,
   type routeFNOpts,
@@ -17,110 +18,110 @@ import {
 } from "@ublitzjs/core"
 var runningTsd: boolean = false;
 
-export async function testIndex(module: typeof import('@ublitzjs/core')){
-  var server = module.extendApp(App(), {a: 10} as const, {b: "b"} as const);
+export async function testIndex(module: typeof import('@ublitzjs/core')) {
+  var server = module.extendApp(App(), { a: 10 } as const, { b: "b" } as const);
   var port: number;
   var socket: us_listen_socket;
   var basicResponse = "hello";
-  function genUrl(url: string){
+  function genUrl(url: string) {
     return "http://localhost:" + port + url;
   }
-  describe("basic functionality of extendApp", ()=>{
-    it("extends", ()=>{
+  describe("basic functionality of extendApp", () => {
+    it("extends", () => {
       // here typescript compiler won't let untyped data stay invisible
       expect(server.get.apply).toBeDefined()
       expect(server.a).toBe(10);
       expect(server.b).toBe("b")
-      if(runningTsd){
+      if (runningTsd) {
         expectType<10>(server.a)
         expectType<"b">(server.b)
       }
     })
-    it("enables 'register' and 'onError'", ()=>{
+    it("enables 'register' and 'onError'", () => {
       var didRun: boolean = false;
-      server.register((serverAgain)=>{
+      server.register((serverAgain) => {
         didRun = true;
         expect(server).toBe(serverAgain);
-        if(runningTsd){
+        if (runningTsd) {
           expectType<typeof server>(serverAgain)
         }
       })
       expect(didRun).toBe(true);
-      function onError(){ } //just to be
+      function onError() { } //just to be
       server.onError(onError)
       expect(server._errHandler).toBe(onError)
     })
-    it("has mechanism for server preparation", async ()=>{
+    it("has mechanism for server preparation", async () => {
       var first = false;
       var second = false;
-      server.awaitLater(Promise.resolve().then(()=>{first = true}), Promise.resolve().then(()=>{second = true;}))
+      server.awaitLater(Promise.resolve().then(() => { first = true }), Promise.resolve().then(() => { second = true; }))
       expect(server._startPromises.length).toBe(2)
       expect([first, second]).toEqual([false, false])
       await server.ready();
       expect([first, second]).toEqual([true, true])
       expect(server._startPromises.length).toBe(0)
     })
-    it("has special 'route' (just its assignment)", ()=>{
-      type compileTimeOptions = {deprecated: boolean}
+    it("has special 'route' (just its assignment)", () => {
+      type compileTimeOptions = { deprecated: boolean }
       var lastDeprecatedMethod: onlyHttpMethods | undefined;
-      function markDeprecation(opts: routeFNOpts<onlyHttpMethods> & compileTimeOptions){
-        if(opts.deprecated) lastDeprecatedMethod = opts.method
+      function markDeprecation(opts: routeFNOpts<onlyHttpMethods> & compileTimeOptions) {
+        if (opts.deprecated) lastDeprecatedMethod = opts.method
       }
       server.route<onlyHttpMethods, compileTimeOptions>({
         method: "get",
         path: "/route",
-        controller(res){ res.end(basicResponse) },
+        controller(res) { res.end(basicResponse) },
         deprecated: true
       }, [markDeprecation])
-      if(runningTsd){
+      if (runningTsd) {
         expectError(
           server.route<"abcd">({
-            controller(){},
-            method:"abcd",
+            controller() { },
+            method: "abcd",
             path: "/"
           })
         )
         expectError(
           server.route<onlyHttpMethods, compileTimeOptions>({
-            controller(){}, method: "get", path: "/"
+            controller() { }, method: "get", path: "/"
           })
         )
       }
       expect(lastDeprecatedMethod).toBe("get")
     })
   })
-  test("closure is a closure indeed", ()=>{
-    var result = module.closure(()=>{
+  test("closure is a closure indeed", () => {
+    var result = module.closure(() => {
       var x = { "a": 10 } as const;
       return x;
     })
     expect(result["a"]).toBe(10)
-    if(runningTsd){
+    if (runningTsd) {
       expectType<{ readonly "a": 10 }>(result)
     }
   })
-  test("Content-Security-Policy generator", ()=>{
-    var result = module.setCSP({ "connect-src": ["'self'"], "style-src": ["'self'"]})
+  test("Content-Security-Policy generator", () => {
+    var result = module.setCSP({ "connect-src": ["'self'"], "style-src": ["'self'"] })
     expect(result).toBe("connect-src 'self'; style-src 'self'; ")
 
     expect(module.CSPDirs["connect-src"]).toEqual(["'self'"])
     result = module.setCSP(module.CSPDirs, "connect-src")
-    expect([ result.search("style-src") != -1, result.search("connect-src") == -1]).toEqual([true, true])
+    expect([result.search("style-src") != -1, result.search("connect-src") == -1]).toEqual([true, true])
   })
-  test("to arrayBuffer", ()=>{
+  test("deprecated to arrayBuffer", () => {
     expect(new TextDecoder().decode(module.toAB(basicResponse))).toBe(basicResponse)
   })
-  await new Promise<void>((resolve, reject)=>{
-    server.listen("localhost", 0, (listenSocket)=>{
+  await new Promise<void>((resolve, reject) => {
+    server.listen("localhost", 0, (listenSocket) => {
       port = us_socket_local_port(listenSocket);
       socket = listenSocket;
-      if(!socket) reject();
+      if (!socket) reject();
       resolve();
     })
   })
-  afterAll(()=>{ us_listen_socket_close(socket) })
-  test("'route' method from extendApp actually works", async ()=>{
-    expect(await fetch(genUrl("/route")).then(res=>res.text())).toBe(basicResponse)
+  afterAll(() => { us_listen_socket_close(socket) })
+  test("'route' method from extendApp actually works", async () => {
+    expect(await fetch(genUrl("/route")).then(res => res.text())).toBe(basicResponse)
   })
   test("extended DeclarativeResponse", async () => {
     server.get(
@@ -190,50 +191,50 @@ export async function testIndex(module: typeof import('@ublitzjs/core')){
         one: "1", two: "2", three: "3", four: "4", five: "5", "content-length": "2"
       })
     })
-    describe("staticHeaders", ()=>{
-      it("returns type of the last param", ()=>{
+    describe("staticHeaders", () => {
+      it("returns type of the last param", () => {
         expectType<"Accept-Ranges">(module.staticHeaders({}, "Accept-Ranges"))
       })
-      it("has validation inside first param", ()=>{
+      it("has validation inside first param", () => {
         expectError(module.staticHeaders({ "Content-Type": "application:json" }, "Accept-Ranges"))
       })
-      it("accepts own headers inside first param", ()=>{
+      it("accepts own headers inside first param", () => {
         expectType<"ABCD">(module.staticHeaders({ "own": "own" }, "ABCD"))
-      }) 
-      it("works", ()=>{
+      })
+      it("works", () => {
         expect(
           module.staticHeaders({
-            "Content-Type": "text/plain", "Content-Range": "bytes 0-999/1000" 
+            "Content-Type": "text/plain", "Content-Range": "bytes 0-999/1000"
           }, "Accept-Ranges")
         ).toBe(
           "Content-Type: text/plain\r\nContent-Range: bytes 0-999/1000\r\nAccept-Ranges"
         )
       })
     })
-    test("typedAllowHeader", ()=>{
+    test("typedAllowHeader", () => {
       var header = module.typedAllowHeader(["ws", "del", "get", "post"])
       expect(header).toBe("DELETE, GET, POST")
     })
   })
-  describe("deprecated route helpers", ()=>{
-    it("seeOtherMethods", async ()=>{
+  describe("deprecated route helpers", () => {
+    it("seeOtherMethods", async () => {
       server.any("/seeOther", module.seeOtherMethods(["ws", "del", "get", "post"]))
       var result = await fetch(genUrl("/seeOther"))
-      var header =  result.headers.get("Allow")
+      var header = result.headers.get("Allow")
       expect(header).toBe("DELETE, GET, POST")
     })
-    it("notFoundConstructor", async ()=>{
+    it("notFoundConstructor", async () => {
       var response = "NOT FOUND!!!"
       server.any("/no", module.notFoundConstructor(response))
       var result = await fetch(genUrl("/no"))
       expect(result.status).toBe(404)
       expect(await result.text()).toBe(response)
     })
-    it("badRequest", async ()=>{
-      server.get("/bad", (res)=>{
+    it("badRequest", async () => {
+      server.get("/bad", (res) => {
         try {
           module.badRequest(res, "it is an error", "JUST BECAUSE");
-        } catch (err){
+        } catch (err) {
           expect((err as Error).cause).toBe("JUST BECAUSE")
         }
       })
@@ -241,16 +242,16 @@ export async function testIndex(module: typeof import('@ublitzjs/core')){
       expect(result.status).toBe(400)
       expect(await result.text()).toBe("it is an error")
     })
-    it("tooLargeBody", async ()=>{
-      server.get("/bad", (res)=>{
+    it("tooLargeBody", async () => {
+      server.get("/bad", (res) => {
         module.tooLargeBody(res, 10);
       })
       var result = await fetch(genUrl("/bad"))
       expect(result.status).toBe(413)
       expect(await result.text()).toBe("Body is too large. Limit in bytes - 10")
     })
-    it("checkContentLength", async ()=>{
-      server.post("/cl", (res, req)=>{
+    it("checkContentLength", async () => {
+      server.post("/cl", (res, req) => {
         var CL: number;
         try {
           CL = module.checkContentLength(res, req);
@@ -258,25 +259,43 @@ export async function testIndex(module: typeof import('@ublitzjs/core')){
         expect(CL!).toBe(1)
         res.endWithoutBody();
       })
-      var result = await fetch(genUrl("/cl"), {method: "post", body: "a"})
+      var result = await fetch(genUrl("/cl"), { method: "post", body: "a" })
       expect(result.status).toBe(200)
     })
   })
-  test("registerAbort", async ()=>{
+  test("deprecated registerAbort", () => {
     var control = new AbortController();
-    server.get("/abort", async (res)=>{
-      module.registerAbort(res)
-      res.emitter.once("abort", ()=>{
-        expect(res.aborted).toBe(true)
+    return new Promise<void>((resolve) => {
+      server.get("/abort/deprecated", (res) => {
+        module.registerAbort(res)
+        res.emitter.once("abort", () => {
+          expect(res.aborted).toBe(true)
+          resolve()
+        })
+        expect(res.aborted).toBe(false)
+        control.abort();
       })
-      expect(res.aborted).toBeFalsy()
-      control.abort();
+      fetch(genUrl("/abort/deprecated"), { signal: control.signal }).catch(() => false)
     })
-    var result = await fetch(genUrl("/abort"), {signal: control.signal}).catch(()=>false)
-    expect(result === false).toBe(true)
+  })
+  test("regAbort", () => {
+    var control = new AbortController();
+    return new Promise<void>((resolve) => {
+      server.get("/abort", (res) => {
+        module.regAbort(res)
+        res.abortCh.sub(() => {
+          expect(res.aborted).toBe(true)
+          resolve();
+        })
+        expect(res.aborted).toBe(false)
+        control.abort();
+      })
+      fetch(genUrl("/abort"), { signal: control.signal }).catch(() => false)
+    })
+
   })
   testParseRange(module.parseRange)
-  test("websockets", async ()=>{
+  test("websockets", async () => {
     var client: WebSocket
 
     await new Promise<void>((resolve) => {
@@ -325,10 +344,10 @@ export async function testIndex(module: typeof import('@ublitzjs/core')){
   })
 }
 
-export function testChannel(module: typeof import("@ublitzjs/core/events")) {
-  describe("Channel", ()=>{
-    var Channel = module.default
-    describe("at least", ()=>{
+export function testChannel(module: typeof import("@ublitzjs/core/channel")) {
+  describe("Channel", () => {
+    var Channel = module.Channel
+    describe("at least", () => {
       it("is typed", () => {
         if (runningTsd) {
           type MessageT = { msg: string }
@@ -348,30 +367,25 @@ export function testChannel(module: typeof import("@ublitzjs/core/events")) {
       let cb1X = 0;
       let cb2X = 0;
       let cb3X = 0;
-      let cb1 = (i: number)=>{cb1X+=i}
-      let cb2 = (i: number)=>{cb2X+=i}
-      let cb3 = (i: number)=>{cb3X+=i}
+      let cb1 = (i: number) => { cb1X += i }
+      let cb2 = (i: number) => { cb2X += i }
+      let cb3 = (i: number) => { cb3X += i }
       function regAll() { ch.sub(cb1); ch.sub(cb2); ch.sub(cb3); }
-      it("publishes messages repeatedly", ()=>{
+      it("publishes messages repeatedly", () => {
         regAll()
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([10, 10, 10])
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
       })
-      it("removes listeners individually", ()=>{
+      it("removes listeners individually", () => {
         expect((cb1 as any).id).toBe(0)
         expect((cb2 as any).id).toBe(1)
         expect((cb3 as any).id).toBe(2)
-        ch.unsub(cb2); ch.unsub(cb1); ch.unsub(cb3); 
+        ch.unsub(cb2); ch.unsub(cb1); ch.unsub(cb3);
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
       })
-      it("removes all listeners", ()=>{
-        regAll(); ch.clear(); 
+      it("removes all listeners (.once is not supported. Use ONE channel for either 'on' or 'once'.", () => {
+        regAll(); ch.clear();
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
-      })
-      it("supports one-time listeners", ()=>{
-        ch.sub(cb1, true); ch.sub(cb2, true); ch.sub(cb3, true)
-        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([30, 30, 30])
-        ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([30, 30, 30])
       })
     })
   })

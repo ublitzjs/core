@@ -3,7 +3,7 @@ import type { BaseHeaders, lowHeaders, RequiredBaseHeaders } from "./http-header
 import uWS from "uWebSockets.js";
 import { Buffer } from "node:buffer";
 import { EventEmitter } from "tseep";
-import Channel from "./events.js"
+import { Channel } from "./channel.js"
 (uWS as any).DeclarativeResponse.prototype.writeHeaders = function (headers: any) {
   for (const key in headers) this.writeHeader(key, headers[key]);
   return this;
@@ -21,7 +21,7 @@ import type {
 } from "uWebSockets.js";
 
 /**
-* Simple utility proving fast (at least 6+ times) tools to handle "onAborted" using "pub/sub" pattern. Inside uses custom "event emitter", but for one single channel. Properties created are "res.aborted (boolean, becomes "true" when res.onAborted fires)" and "res.abortCh (abort channel, imported from @ublitzjs/core/events). However all callbacks you pass to "abortCh.sub" get "id" property. Don't touch it, ok? It assists with O(1) removal.
+* Simple utility proving fast (at least 6+ times) tools to handle "onAborted" using "pub/sub" pattern. Inside uses custom "event emitter", but for one single event. Properties created are "res.aborted (boolean, becomes "true" when res.onAborted fires)" and "res.abortCh (abort channel, imported from @ublitzjs/core/channel). However all callbacks you pass to "abortCh.sub" get "id" property. Don't touch it, ok? It assists with O(1) removal.
 * @example
 * server.get('/', (res)=>{
 *   res.aborted === undefined // true
@@ -44,7 +44,8 @@ export function regAbort(res: uwsHttpResponse): HttpResponse {
   res.abortCh = new Channel<undefined>()
   return res.onAborted(() => {
     res.aborted = true;
-    res.abortCh.pub()
+    res.abortCh.pub(undefined);
+    res.abortCh.clear()
   }) as HttpResponse;
 }
 /**

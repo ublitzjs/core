@@ -1,12 +1,12 @@
 {
   "name": "@ublitzjs/core",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "types": "./dist/types/index.d.ts",
   "files": ["dist", "LICENSE"],
   "typesVersions": {
     "*": {
       ".": ["./dist/types/index.d.ts"],
-      "events": ["./dist/types/events.d.ts"]
+      "channel": ["./dist/types/channel.d.ts"]
     }
   },
   "license": "MIT",
@@ -16,10 +16,10 @@
       "require": "./dist/cjs/index.js",
       "import": "./dist/esm/index.js"
     },
-    "./events": {
-      "types": "./dist/types/events.d.ts",
-      "require": "./dist/cjs/events.js",
-      "import": "./dist/esm/events.js"
+    "./channel": {
+      "types": "./dist/types/channel.d.ts",
+      "require": "./dist/cjs/channel.js",
+      "import": "./dist/esm/channel.js"
     }
   },
   "dependencies": {
@@ -49,7 +49,9 @@
     "build:cjs": "babel dist/esm --out-dir dist/cjs",
     "build:types": "tsc -p tsconfig.types.json",
     "build": "npm run build:types && npm run build:esm && npm run build:cjs",
-    "test": "tsd && vitest run tests/index.test.ts --coverage"
+    "test:base": "tsd && vitest run tests/index.test.ts --coverage",
+    "test:channel": "node tests/ch-bench.mjs",
+    "test": "bun run test:base && bun run test:channel"
   },
   "tsd": {
     "directory": "tests"
@@ -74,6 +76,7 @@
     "headers",
     "codes",
     "development",
+    "fastest pub/sub event emitter",
     "asynchronous code",
     "µBlitz.js"
   ]

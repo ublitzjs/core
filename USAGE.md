@@ -92,42 +92,32 @@ server.get("/", (res, req)=>{
 
 ```
 
-# registerAbort
-
-this utility lets you extend your handlers in a very asynchronous manner and nothing will ever brake.<br>
-Emitter used here is "tseep", which is faster than node:events.
+# Channel and regAbort
+"regAbort" is a utility (don't confuse with registerAbort which is deprecated), that lets you extend "res.onAborted" in a "pub/sub" style. It is done using "Channel" class. "regAbort" registers "res.aborted" flag and "res.abortCh", which is a Channel instance, to which you can subscribe listeners and remove them by one, or all at once. 
 
 ```typescript
-import type { HttpResponse } from "@ublitzjs/core";
-function someHeavyHandler(res: HttpResponse) {
-  console.log("I DO SOMETHING LARGE, LIKE STREAMING VIDEO")
-  return new Promise<boolean>((resolve)=>{
-    res.emitter.once("abort", () => {
-      /*close file descriptor*/
-      resolve(false);
-    });
-    setTimeout(()=>{
-      if(!res.aborted) { console.log("HAVE SENT FILE"); resolve(true) }
-    }, 1000)
-  })
-}
-server.get("/", (res) => {
-  registerAbort(res);
-  console.log(/*added on the response*/ res.emitter);
+server.get('/', (res)=>{
+  res.aborted === undefined // true
+  res.abortCh === undefined // true
 
-  res.emitter.once("abort", () => {
-    console.log("ABORTED");
-    // as an example
-    stopDatabaseTransaction();
-  });
+  regAbort(res);
+  res.aborted === false;
+  function onAb() { console.log("aborted"); }
+  res.abortCh.sub(onAb);
 
-  // easily cleans up if aborted
-  var haveSentFile = await someHeeavyHandler(res);
-});
+  setTimeout(()=>{
+    if(!res.aborted) { // you need to check, otherwise uWS drops server
+      res.abortCh.unsub(onAb); // O(1) lookup
+      res.end("HOORAY")
+    }
+  }, 1000)
+})
 ```
+Before there was a "registerAbort" which registered "res.emitter" ("tseep" instance). However it appeared to spend excessive time on creation (new EventEmitter). Even though it cleverly generates "emit" handler for "on" callbacks, the very generation also takes time (which is tested in benchmarks in this repo).
+There is also a "cozyevent" emitter with fast creation, however its "emit" function is slower than of "node:events". 
+Standard "node:events" is mostly sufficient, however removing elements is not that fast.
 
-It is heavily used in @ublitzjs/static to stop file streams
-
+To address given issues I have created "Channel" (example above) and benchmarked it...
 # TypeScript support
 
 Another benefit of using this package are additional typescript docs (and some for uWS, that they haven't added yet)

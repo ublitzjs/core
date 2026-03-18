@@ -1,19 +1,19 @@
 import runTests from "./abstraction"
-//import {createRequire} from "node:module"
-// var require = createRequire(import.meta.url);
+import {createRequire} from "node:module"
+var require = createRequire(import.meta.url);
 
 
 await runTests(["uWebSockets.js"], [
-  //{
-  //  normalCJS: require("@ublitzjs/core"),
-  //  normalESM: await import("@ublitzjs/core"),
-  //  test: "testIndex",
-  //  name: "index.js"
-  //},
   {
-    //normalCJS: require("@ublitzjs/core/events"),
-    normalESM: await import("@ublitzjs/core/events"),
+    normalCJS: require("@ublitzjs/core"),
+    normalESM: await import("@ublitzjs/core"),
+    test: "testIndex",
+    name: "index.js"
+  },
+  {
+    normalCJS: require("@ublitzjs/core/channel"),
+    normalESM: await import("@ublitzjs/core/channel"),
     test: "testChannel",
-    //name: "events.js"
+    name: "channel.js"
   }
 ])
