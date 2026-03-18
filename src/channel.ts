@@ -3,8 +3,6 @@
 * */
 export type ChannelCB<T> = ((data: T)=>void) & {id: number}
 
-//function pubSingle(this: Channel<any>, data:any) { if(this.cb)this.cb(data) }
-function pubMulti(this: Channel<any>, data: any) { for (var cb of this.cb) cb(data) }
 /**
 * An event channel, pub/sub pattern, replacement (for ordinary event emitter. Creation is faster, removal is O(1) (callbacks get "id" property for this, don't touch it), hence is scalable. When has one listener (not when it had more and then left 1) - has optimization.  It is used in "HttpResponse.abortCh
 * If you want to have something like "emitter.emit("event", data)" just create an object with channels: {"event": new Channel()}.
@@ -30,45 +28,29 @@ function pubMulti(this: Channel<any>, data: any) { for (var cb of this.cb) cb(da
 * channel.clear()
 * */
 export class Channel<MessageType> {
-  /**
-  * undefined | ChannelCB<T> | ChannelCB<T>[]
-  * */
-  protected cb: any = undefined;
-  protected s: number = 0;
+  protected cbs: ChannelCB<MessageType>[] = [];
   /**find out if there are any active listeners*/
-  get isEmpty() { return !this.cb }
+  get isEmpty() { return !this.cbs }
   /**subscribe to channel.*/
   sub(fn: (msg: MessageType) => void) {
-    switch (this.s) {
-      case 2:
-        (fn as any).id = this.cb.length; this.cb.push(fn); 
-        break
-      //case 1:
-      //  this.cb.id = 0; (fn as any).id = 1;
-      //  this.cb = [this.cb, fn]; this.s = 2; this.pub = pubMulti;
-      //  break;
-      default: this.cb = [fn]; (fn as any).id = 0; this.s=2; 
-    }
+    (fn as any).id = this.cbs.length; this.cbs.push(fn as any);  
   }
   /**unsubscribe from channel - remove only callbacks, that are definitely stored inside. Otherwise function throws an error*/
   unsub(fn: (msg: MessageType) => void) {
-    if (this.s == 2) {
-      let id: number = (fn as any).id
-      if (id == this.cb.length - 1)
-        this.cb.pop();
-      else {
-        let newCb = (this.cb[id] = this.cb.pop()); newCb.id = id;
-      }
-    } else {
-      this.cb = undefined; this.s = 0; 
+    let id: number = (fn as any).id
+    if (id == this.cbs.length - 1)
+      this.cbs.pop();
+    else {
+      let newCb = (this.cbs[id] = this.cbs.pop()!); newCb.id = id;
     }
   }
   /**publish a message to the whole channel. While the function is active, don't remove any of channel's listeners. */
-  pub: (data: MessageType)=>void = pubMulti
-  clear() {
-   // if (this.s == 1) { this.cb = undefined; this.s = 0 } else 
-      if(this.s) this.cb = []
-  }
+  pub(data: MessageType){
+    for (let i = 0;  i < this.cbs.length; ++i) {
+      this.cbs[i]!(data);
+    }
+  } 
+  clear() { this.cbs = [] }
 }
 
 /**
