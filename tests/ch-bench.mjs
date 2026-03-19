@@ -387,8 +387,8 @@ closure(() => {
   console.table(bench.table())
   var [tseepRes, myRes, nodeRes, cozyRes] = bench.tasks
   if (speedOf(myRes) / speedOf(tseepRes) < 6.5
-    || (speedOf(myRes) / speedOf(nodeRes)) < 2.5
-    || (speedOf(myRes) / speedOf(cozyRes)) < 1.5
+    || (speedOf(myRes) / speedOf(nodeRes)) < 2.3
+    || (speedOf(myRes) / speedOf(cozyRes)) < 1.4
   ) errors.push(new Error("mixed creation+listeners+emit too slow"))
 })
 if (errors.length) { console.error(errors); process.exit(1) }

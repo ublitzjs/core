@@ -4,10 +4,8 @@
 export type ChannelCB<T> = ((data: T)=>void) & {id: number}
 
 /**
-* An event channel, pub/sub pattern, replacement (for ordinary event emitter. Creation is faster, removal is O(1) (callbacks get "id" property for this, don't touch it), hence is scalable. When has one listener (not when it had more and then left 1) - has optimization.  It is used in "HttpResponse.abortCh
+* An event channel, pub/sub pattern, replacement (for ordinary event emitter. Creation is faster, removal is O(1) (callbacks get "id" property for this, don't touch it), hence is scalable (but order of listeners is not preserved). It is used in "HttpResponse.abortCh
 * If you want to have something like "emitter.emit("event", data)" just create an object with channels: {"event": new Channel()}.
-* It doesn't support "once" events, because all you need is just "clear" the channel for it. 
-* It doesn't handle cases when you are deleting a listener within "pub" call. It can skip other listener. If you want both 'once' and 'on' listeners, create 2 separate channels for both handlers, for 'once' use "channel.clear()"
 * Took some inspiration from tseep.
 * @example
 * // any message you'd like to send. It can be anything
@@ -18,10 +16,10 @@ export type ChannelCB<T> = ((data: T)=>void) & {id: number}
 *   console.log("Here is a message", message)
 * }
 * channel.sub(subscriber1)
-* function sub2 () {}
-* channel.sub(sub2)
+* function selfUnsubListener() {channel.unsubCurrent()}
+* channel.sub(selfUnsubListener)
 * // message is of MessageT
-* channel.pub(`hello, MISTER ANDERSON`)
+* channel.pub(`hello, MISTER ANDERSON`) // it unsubs seldUnsubListener
 * // remove subscribers individually
 * channel.unsub(subscriber1)
 * // remove all subscribers at once
@@ -29,14 +27,16 @@ export type ChannelCB<T> = ((data: T)=>void) & {id: number}
 * */
 export class Channel<MessageType> {
   protected cbs: ChannelCB<MessageType>[] = [];
+  protected i: number = 0;
   /**find out if there are any active listeners*/
-  get isEmpty() { return !this.cbs }
-  /**subscribe to channel.*/
+  get isEmpty() { return !this.cbs.length }
+  /**subscribe listener to channel. This method attaches "id" property to listener. Don't modify it.*/
   sub(fn: (msg: MessageType) => void) {
     var cbs = this.cbs; 
     (fn as any).id = cbs.length; cbs.push(fn as any);  
   }
-  /**unsubscribe from channel - remove only callbacks, that are definitely stored inside. Otherwise function throws an error*/
+  /**lets you unsubscribe listeners. It uses "listener.id" property for O(1) speed, so don't touch it. 
+  * "unsub" replaces removed listener with the last-registered, so order changes.*/
   unsub(fn: (msg: MessageType) => void) {
     var cbs = this.cbs
     let id: number = (fn as any).id
@@ -46,11 +46,26 @@ export class Channel<MessageType> {
       let newCb = (cbs[id] = cbs.pop()!); newCb.id = id;
     }
   }
-  /**publish a message to the whole channel. While the function is active, don't remove any of channel's listeners. */
+  /**
+  * this function lets you unsubscribe the listener, which is currently used in "pub" function.
+  * @example 
+  * var ch = new Channel();
+  * function once(msg) {console.log(msg); ch.unsubCurrent()}
+  * ch.sub(once); 
+  * ch.pub("hello")
+  * // here once is not registered
+  * ch.pub("world")
+  * */
+  unsubCurrent() {
+    var cbs = this.cbs;
+    if(this.i == cbs.length - 1) {cbs.pop(); return;};
+    var newCb = (cbs[this.i] = cbs.pop()!); newCb.id = this.i--;
+  }
+  /**Publish some data to all listeners. You can remove listeners on the fly by using "unsubCurrent" (see example in jsdoc of unsubCurrent)*/
   pub(data: MessageType){
     var cbs = this.cbs
-    for (let i = 0;  i < cbs.length; i++) {
-      cbs[i]!(data);
+    for (this.i = 0; this.i < cbs.length; this.i++) {
+      cbs[this.i]!(data);
     }
   } 
   clear() { this.cbs = [] }

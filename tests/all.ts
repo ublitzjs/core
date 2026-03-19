@@ -371,6 +371,13 @@ export function testChannel(module: typeof import("@ublitzjs/core/channel")) {
       let cb2 = (i: number) => { cb2X += i }
       let cb3 = (i: number) => { cb3X += i }
       function regAll() { ch.sub(cb1); ch.sub(cb2); ch.sub(cb3); }
+      it("tells if is empty", ()=>{
+        expect(ch.isEmpty).toBe(true)
+        ch.sub(cb1)
+        expect(ch.isEmpty).toBe(false)
+        ch.unsub(cb1)
+        expect(ch.isEmpty).toBe(true)
+      })
       it("publishes messages repeatedly", () => {
         regAll()
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([10, 10, 10])
@@ -388,10 +395,11 @@ export function testChannel(module: typeof import("@ublitzjs/core/channel")) {
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
       })
       it("has 'self-deleting' listeners (once)", () => {
-        ch.sub(cb1); function once(i: number) {cb2X+=i; ch.unsubCurrent();}; ch.sub(once)
+        ch.sub(cb1); function once(i: number) {cb2X+=i; ch.unsubCurrent();console.log("ONCE")}; ch.sub(once)
         ch.pub(10); expect([cb1X, cb2X]).toEqual([30, 30])
         ch.pub(10); expect([cb1X, cb2X]).toEqual([40, 30])
       })
+
     })
   })
   describe("EventEmitter parody", () => {
