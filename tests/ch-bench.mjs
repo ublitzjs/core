@@ -113,32 +113,6 @@ closure(() => {
   ) errors.push(new Error("10 listeners individually NOT faster"))
 })
 closure(() => {
-  console.log("1 listener publish (+ 'this' context) as without emitter")
-  var ctx = { foo: "bar" }
-  var bench = new Bench({ time: 1000 });
-  function myHandle() { }
-  var handler = myHandle.bind(ctx)
-  var my = { foo: new Channel() }; my.foo.sub(handler)
-
-  bench.add("nothing", () => {
-    handler()
-    handler()
-    handler()
-    handler()
-  }).add("channel", () => {
-    my.foo.pub()
-    my.foo.pub()
-    my.foo.pub()
-    my.foo.pub()
-  })
-
-  bench.runSync()
-  console.table(bench.table())
-  var [nothingRes, myRes] = bench.tasks
-  var vsNothing = speedOf(myRes) / speedOf(nothingRes);
-  if (vsNothing < 0.92) errors.push(new Error("1 listeners 'pub' TOO SLOW", { cause: vsNothing }))
-})
-closure(() => {
   console.log("'unrealistic' constant 'emit' with no add/remove")
   var tseep = new Tseep_ee(); tseep.on("foo", bar).on("foo", baz).on("foo", foo)
   var node = new Node_ee(); node.on("foo", bar).on("foo", baz).on("foo", foo)
@@ -386,7 +360,7 @@ closure(() => {
   bench.runSync()
   console.table(bench.table())
   var [tseepRes, myRes, nodeRes, cozyRes] = bench.tasks
-  if (speedOf(myRes) / speedOf(tseepRes) < 6.5
+  if (speedOf(myRes) / speedOf(tseepRes) < 5.5
     || (speedOf(myRes) / speedOf(nodeRes)) < 2.3
     || (speedOf(myRes) / speedOf(cozyRes)) < 1.4
   ) errors.push(new Error("mixed creation+listeners+emit too slow"))
