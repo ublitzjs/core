@@ -383,9 +383,14 @@ export function testChannel(module: typeof import("@ublitzjs/core/channel")) {
         ch.unsub(cb2); ch.unsub(cb1); ch.unsub(cb3);
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
       })
-      it("removes all listeners (.once is not supported. Use ONE channel for either 'on' or 'once'.", () => {
+      it("removes all listeners", () => {
         regAll(); ch.clear();
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
+      })
+      it("has 'self-deleting' listeners (once)", () => {
+        ch.sub(cb1); function once(i: number) {cb2X+=i; ch.unsubCurrent();}; ch.sub(once)
+        ch.pub(10); expect([cb1X, cb2X]).toEqual([30, 30])
+        ch.pub(10); expect([cb1X, cb2X]).toEqual([40, 30])
       })
     })
   })

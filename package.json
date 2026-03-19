@@ -1,6 +1,6 @@
 {
   "name": "@ublitzjs/core",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "types": "./dist/types/index.d.ts",
   "files": ["dist", "LICENSE"],
   "typesVersions": {
