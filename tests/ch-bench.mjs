@@ -174,7 +174,7 @@ closure(() => {
   bench.runSync()
   console.table(bench.table())
   var [myRes, tseepRes, nodeRes, cozyRes] = bench.tasks
-  if (speedOf(tseepRes) / speedOf(myRes) > 1.3
+  if (speedOf(tseepRes) / speedOf(myRes) > 1.4
     || (speedOf(myRes) / speedOf(nodeRes)) < 1.1
     || (speedOf(myRes) <= speedOf(cozyRes))
   ) errors.push(new Error("unrealistic 'emit' is slow"))

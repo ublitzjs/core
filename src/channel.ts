@@ -64,8 +64,9 @@ export class Channel<MessageType> {
   /**Publish some data to all listeners. You can remove listeners on the fly by using "unsubCurrent" (see example in jsdoc of unsubCurrent)*/
   pub(data: MessageType){
     var cbs = this.cbs
-    for (this.i = 0; this.i < cbs.length; this.i++) {
+    while(this.i < cbs.length) {
       cbs[this.i]!(data);
+      this.i++
     }
   } 
   clear() { this.cbs = [] }
