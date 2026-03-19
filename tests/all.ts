@@ -389,4 +389,73 @@ export function testChannel(module: typeof import("@ublitzjs/core/channel")) {
       })
     })
   })
+  describe("EventEmitter parody", () => {
+    var EventEmitter = module.EventEmitter
+    describe("at least", () => {
+      it("is typed", () => {
+        if (runningTsd) {
+          type payload2 = { hello: 1 }
+          let em = new EventEmitter<{ event1: string, event2: payload2 }>()
+          em.on("event1", (data: string) => { data; })
+          em.on("event2", (data: payload2) => { data; })
+
+          expectError(em.on("event1", (data: number) => { data; }))
+          expectError(em.on("event2", (data: string) => { data; }))
+          expectError(em.on("event3", () => { }))
+
+          em.removeAllListeners("event1")
+          em.removeAllListeners()
+          expectError(em.removeAllListeners("event3"))
+
+          em.off("event1", (data: string) => { data; })
+          expectError(em.off("event1", (data: number) => { data; }))
+          em.off("event2", (data: payload2) => { data; })
+          expectError(em.off("event2", (data: number) => { data; }))
+          expectError(em.off("event3", () => { }))
+          em.emit("event1", "")
+          em.emit("event2", { hello: 1 })
+          expectError(em.emit("event1", 1))
+          expectError(em.emit("event2", { hello: 2 }))
+          expectError(em.emit("event3", 1))
+        }
+      })
+
+      var em = new EventEmitter<{ event: number }>;
+      let cb1X = 0;
+      let cb2X = 0;
+      let cb3X = 0;
+      let cb1 = (i: number) => { cb1X += i }
+      let cb2 = (i: number) => { cb2X += i }
+      let cb3 = (i: number) => { cb3X += i }
+      function regAll() { em.on("event", cb1); em.on("event", cb2); em.on("event", cb3); }
+      it("publishes messages repeatedly", () => {
+        regAll()
+        em.emit("event", 10); expect([cb1X, cb2X, cb3X]).toEqual([10, 10, 10])
+        em.emit("event", 10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
+      })
+      it("removes listeners individually", () => {
+        expect((cb1 as any).id).toBe(0)
+        expect((cb2 as any).id).toBe(1)
+        expect((cb3 as any).id).toBe(2)
+        em.off("event", cb2); em.off("event", cb1); em.off("event", cb3);
+        expect("id" in cb1).toBe(false)
+        expect("id" in cb2).toBe(false)
+        expect("id" in cb3).toBe(false)
+        em.emit("event", 10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
+      })
+      it("publishes 'once' messages and removes listeners", () => {
+        em.on("event", (i) => { cb1X += i })
+        em.once("event", (i) => { cb2X += i })
+        em.emit("event", 10); expect([cb1X, cb2X]).toEqual([30, 30])
+        em.emit("event", 10); expect([cb1X, cb2X]).toEqual([40, 30])
+        var cb = (i: number) => { cb2X += i }
+        em.once("event", cb); em.offOnce("event", cb)
+        em.emit("event", 10); expect([cb1X, cb2X]).toEqual([50, 30])
+      })
+      it("removes all listeners", () => {
+        regAll(); em.removeAllListeners("event")
+        em.emit("event", 10); expect([cb1X, cb2X, cb3X]).toEqual([50, 30, 20])
+      })
+    })
+  })
 }

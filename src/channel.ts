@@ -33,21 +33,24 @@ export class Channel<MessageType> {
   get isEmpty() { return !this.cbs }
   /**subscribe to channel.*/
   sub(fn: (msg: MessageType) => void) {
-    (fn as any).id = this.cbs.length; this.cbs.push(fn as any);  
+    var cbs = this.cbs; 
+    (fn as any).id = cbs.length; cbs.push(fn as any);  
   }
   /**unsubscribe from channel - remove only callbacks, that are definitely stored inside. Otherwise function throws an error*/
   unsub(fn: (msg: MessageType) => void) {
+    var cbs = this.cbs
     let id: number = (fn as any).id
-    if (id == this.cbs.length - 1)
-      this.cbs.pop();
+    if (id == cbs.length - 1)
+      cbs.pop();
     else {
-      let newCb = (this.cbs[id] = this.cbs.pop()!); newCb.id = id;
+      let newCb = (cbs[id] = cbs.pop()!); newCb.id = id;
     }
   }
   /**publish a message to the whole channel. While the function is active, don't remove any of channel's listeners. */
   pub(data: MessageType){
-    for (let i = 0;  i < this.cbs.length; ++i) {
-      this.cbs[i]!(data);
+    var cbs = this.cbs
+    for (let i = 0;  i < cbs.length; i++) {
+      cbs[i]!(data);
     }
   } 
   clear() { this.cbs = [] }
@@ -66,7 +69,7 @@ export class EventEmitter<T extends Record<string|number|symbol, any>> {
   } = {} as any
   on<K extends keyof T>(ev: K, handler: (this: Channel<T[K]>, data: T[K])=>void) {
     var obj = this.events[ev]
-    if (!obj) obj = {
+    if (!obj) this.events[ev] = obj = {
       on: new Channel(),
       once: new Channel()
     }
@@ -74,7 +77,7 @@ export class EventEmitter<T extends Record<string|number|symbol, any>> {
   }
   once<K extends keyof T>(ev: K, handler: (this: Channel<T[K]>, data: T[K])=>void) {
     var obj = this.events[ev]
-    if (!obj) obj = {
+    if (!obj) this.events[ev] = obj = {
       on: new Channel(),
       once: new Channel()
     }
@@ -83,15 +86,18 @@ export class EventEmitter<T extends Record<string|number|symbol, any>> {
   /**Remove listener from event. For 'once' listeners you 'offOnce'*/
   off<K extends keyof T>(ev: K, handler: (this: Channel<T[K]>, data: T[K])=>void) {
     var obj = this.events[ev]
-    if(!obj) return;
+    if(!obj || !("id" in handler)) return;
     obj.on.unsub(handler)
+    delete handler.id
   }
   /**Remove 'once' listener from event*/
   offOnce<K extends keyof T>(ev: K, handler: (this: Channel<T[K]>, data: T[K])=>void) {
     var obj = this.events[ev]
-    if(!obj) return;
+    if(!obj || !("id" in handler)) return;
     obj.once.unsub(handler)
+    delete handler.id
   }
+  /**Here message first goes to "once" listeners, then - 'on'*/
   emit<K extends keyof T>(ev: K, data: T[K]) {
     var obj = this.events[ev]
     if(!obj) return;
