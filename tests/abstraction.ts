@@ -1,21 +1,18 @@
-import {mkdirSync, rmSync} from "node:fs"
-import {afterAll, describe} from "vitest"
+import {describe} from "vitest"
 import {build, type BuildOptions} from "esbuild"
 import {cwd} from "node:process"
 import {resolve} from "node:path"
 import { createRequire } from "node:module"
 import * as tests from "./all"
 type Module = {
-  name: string;
-  normalESM: any,
-  normalCJS: any,
+  name?: string;
+  normalESM?: any,
+  normalCJS?: any,
   test: keyof typeof import("./all")
 }
 
 var require = createRequire(import.meta.url)
 var tmpDir = resolve(cwd(), "tmp");
-try { mkdirSync(tmpDir) } catch {}
-afterAll(()=>{rmSync(tmpDir, {force: true, recursive: true})})
 
 export default async function(externalLibraries: string[], testedModules: Module[]){
   var buildOptions: BuildOptions = {
@@ -40,43 +37,60 @@ export default async function(externalLibraries: string[], testedModules: Module
     ignoreAnnotations: false,
     resolveExtensions: [".mts", ".ts", ".js", ".mjs", ".cts", ".cjs"],
   }
-  await Promise.all([
-    build({
-      ...buildOptions,
-      format: "esm",
-      entryPoints: testedModules.map(val=>resolve(cwd(), "dist/esm/"+val.name)),
-      outdir: resolve(tmpDir, "esm"),
-    }),
-    build({
-      ...buildOptions,
-      format: "cjs",
-      entryPoints: testedModules.map(val=>resolve(cwd(), "dist/cjs/"+val.name)),
-      outdir: resolve(tmpDir, "cjs"),
+  var esmTmp = resolve(tmpDir, "esm")
+  var cjsTmp = resolve(tmpDir, "cjs")
+  var hasESMNormal = false;
+  var hasMini = false;
+  var hasCJSNormal = false;
+  for (const module of testedModules) {
+    if(module.normalESM) hasESMNormal = true;
+    if(module.normalCJS) hasCJSNormal = true;
+    if(module.name) hasMini = true;
+  }
+  if (hasCJSNormal || hasMini)
+    describe("CJS", {sequential: true}, () => {
+      if (hasCJSNormal)
+        describe("NORMAL", async () => {
+          for (var module of testedModules) {
+            if (module.normalCJS) await tests[module.test](module.normalCJS)
+          }
+        })
+      if (hasMini)
+        describe("MINIFIED", async () => {
+          for (var module of testedModules) {
+            if (!module.name) continue;
+            const outfile = resolve(cjsTmp, module.name);
+            await build({
+              ...buildOptions,
+              entryPoints: ["dist/cjs/" + module.name],
+              format: "cjs", outfile
+            })
+            await tests[module.test](require(outfile))
+            delete require.cache[require.resolve(outfile)]
+          }
+        })
     })
-  ])
-  describe("CJS", ()=>{
-    describe("NORMAL", ()=>{
-      for (var module of testedModules) {
-        tests[module.test](module.normalCJS)
-      }
+  if (hasESMNormal || hasMini)
+    describe("ESM", {sequential: true}, () => {
+      if (hasESMNormal)
+        describe("NORMAL", async () => {
+          for (var module of testedModules) {
+            if (module.normalESM) await tests[module.test](module.normalESM)
+          }
+        })
+      if (hasMini)
+        describe("MINIFIED", async () => {
+          for (var module of testedModules) {
+            if (!module.name) continue;
+            const outfile = resolve(esmTmp, module.name);
+            await build({
+              ...buildOptions,
+              entryPoints: ["dist/esm/" + module.name],
+              format: "cjs", outfile
+            })
+            await tests[module.test](await import(outfile))
+          }
+        })
     })
-    describe("MINIFIED", ()=>{
-      for (var module of testedModules) {
-        tests[module.test](require(resolve(tmpDir, "cjs", module.name)))
-      }
-    })
-  })
-  describe("ESM", ()=>{
-    describe("NORMAL", ()=>{
-      for (var module of testedModules) {
-        tests[module.test](module.normalESM)
-      }
-    })
-    describe("MINIFIED", async () => {
-      for (var module of testedModules) {
-        tests[module.test](await import(resolve(tmpDir, "esm", module.name)))
-      }
-    })
-  })
 }
 

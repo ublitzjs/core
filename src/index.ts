@@ -3,6 +3,7 @@ import type { BaseHeaders, lowHeaders, RequiredBaseHeaders } from "./http-header
 import uWS from "uWebSockets.js";
 import { Buffer } from "node:buffer";
 import { EventEmitter } from "tseep";
+import { Channel } from "./channel.js"
 (uWS as any).DeclarativeResponse.prototype.writeHeaders = function (headers: any) {
   for (const key in headers) this.writeHeader(key, headers[key]);
   return this;
@@ -20,13 +21,36 @@ import type {
 } from "uWebSockets.js";
 
 /**
- * function to effortlessly mark response as aborted AND to attach an event emitter, so that you can easily scale the handler. If you don't need event emitter and only some res.aborted - set it by yourself (no overkill for the handler)
- * If some utility expect import("@ublitzjs/core").HttpResponse, it means that they response to first go through this registerAbort
- * @param res
- * @example
- * console.log(Boolean(res.emitter)) // false
- * registerAbort(res)
- * console.log(Boolean(res.emitter)) // true
+* Simple utility proving fast (at least 6+ times) tools to handle "onAborted" using "pub/sub" pattern. Inside uses custom "event emitter", but for one single event. Properties created are "res.aborted (boolean, becomes "true" when res.onAborted fires)" and "res.abortCh (abort channel, imported from @ublitzjs/core/channel). However all callbacks you pass to "abortCh.sub" get "id" property. Don't touch it, ok? It assists with O(1) removal.
+* @example
+* server.get('/', (res)=>{
+*   res.aborted === undefined // true
+*   res.abortCh === undefined // true
+*   regAbort(res); // no unwanted overhead
+*   res.aborted === false;
+*   function onAb() { console.log("aborted"); }
+*   res.abortCh.sub(onAb);
+*   setTimeout(()=>{
+*     if(!res.aborted) { // you need to check, otherwise uWS drops server
+*       res.abortCh.unsub(onAb); // O(1) lookup
+*       res.end("HOORAY")
+*     }
+*   }, 1000)
+* })
+* */
+export function regAbort(res: uwsHttpResponse): HttpResponse {
+  if ("aborted" in res) throw new Error("abort already registered");
+  res.aborted = false;
+  res.abortCh = new Channel<undefined>()
+  return res.onAborted(() => {
+    res.aborted = true;
+    res.abortCh.pub(undefined);
+    res.abortCh.clear()
+  }) as HttpResponse;
+}
+/**
+ * @deprecated this function uses "tseep" dependency, which adds an overhead while gets created and doesn't give just one "abort" channel - too much. Instead use "regAbort", which adds "abortCh" (abort channel, AT LEAST 6 TIMES FASTER)
+ * this function adds "res.emitter and res.aborted=false".
  */
 export function registerAbort(res: uwsHttpResponse): HttpResponse {
   if (typeof res.aborted === "boolean")
@@ -130,21 +154,34 @@ export interface HttpResponse<UserDataForWS = {}>
    */
   collect: (...any: any[]) => any;
   /**
-   * An event emitter, which lets you subscribe several listeners to "abort" event OR your own events, defined with Symbol() | other string
-   * @example
-   * res.emitter.once("abort", ()=>{
-   *   console.log("I have to clean up some random file descriptor")
-   *   // do cleanup
-   * })
+   * @deprecated This is an event emitter, but it is "too much" as just an "onAborted" extension. Don't use "registerAbort", and it won't appear. Instead use "regAbort" and you will get better "res.abortCh"
    */
   emitter: EventEmitter<{
     abort: () => void;
     [k: symbol]: (...any: any[]) => void;
   }>;
   /**
-   * changes when res.onAborted fires (you have to use registerAbort for this)
+  * An event channel for onAborted. You can subscribe to it and unsubscribe. "pub/clear" are better to be avoided here
+  * server.get('/', (res)=>{
+  *   res.aborted === undefined // true
+  *   res.abortCh === undefined // true
+  *   regAbort(res); // no unwanted overhead
+  *   res.aborted === false;
+  *   function onAb() { console.log("aborted"); }
+  *   res.abortCh.sub(onAb);
+  *   setTimeout(()=>{
+  *     if(!res.aborted) { // you need to check, otherwise uWS drops server
+  *       res.abortCh.unsub(onAb); // O(1) lookup
+  *       res.end("HOORAY")
+  *     }
+  *   }, 1000)
+  * })
+  * */
+  abortCh: Channel<undefined>
+  /**
+   * changes when res.onAborted fires (you have to use regAbort (not registerAbort) for this)
    */
-  aborted?: boolean;
+  aborted: boolean;
   /**
    * You should set it manually when ending the response. Particularly useful if some error has fired and you are doubting whether res.aborted is a sufficient flag.
    * @example
