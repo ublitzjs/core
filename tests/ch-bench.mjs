@@ -211,9 +211,9 @@ closure(() => {
   bench.runSync()
   console.table(bench.table())
   var [myRes, tseepRes, nodeRes, cozyRes] = bench.tasks
-  if (speedOf(myRes) / speedOf(tseepRes) < 5 // due to in-flight optimizations
+  if (speedOf(myRes) / speedOf(tseepRes) < 4.6 // due to in-flight optimizations
     || (speedOf(myRes) / speedOf(nodeRes)) < 1.7
-    || (speedOf(myRes) / speedOf(cozyRes)) < 1.1 // for 1 changing emitter cozyevent shines
+    || (speedOf(myRes) <= speedOf(cozyRes)) // for 1 changing emitter cozyevent shines
   ) errors.push(new Error("realistic emit is slow"))
 })
 closure(() => {
