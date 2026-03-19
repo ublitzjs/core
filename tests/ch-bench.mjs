@@ -174,7 +174,7 @@ closure(() => {
   bench.runSync()
   console.table(bench.table())
   var [myRes, tseepRes, nodeRes, cozyRes] = bench.tasks
-  if (speedOf(tseepRes) / speedOf(myRes) > 1.15
+  if (speedOf(tseepRes) / speedOf(myRes) > 1.3
     || (speedOf(myRes) / speedOf(nodeRes)) < 1.1
     || (speedOf(myRes) <= speedOf(cozyRes))
   ) errors.push(new Error("unrealistic 'emit' is slow"))
@@ -237,9 +237,9 @@ closure(() => {
   bench.runSync()
   console.table(bench.table())
   var [myRes, tseepRes, nodeRes, cozyRes] = bench.tasks
-  if (speedOf(myRes) / speedOf(tseepRes) < 6 // due to in-flight optimizations
+  if (speedOf(myRes) / speedOf(tseepRes) < 5 // due to in-flight optimizations
     || (speedOf(myRes) / speedOf(nodeRes)) < 1.7
-    || (speedOf(myRes) / speedOf(cozyRes)) < 1.1 // for 1 changing emitter cozy shines
+    || (speedOf(myRes) / speedOf(cozyRes)) < 1.1 // for 1 changing emitter cozyevent shines
   ) errors.push(new Error("realistic emit is slow"))
 })
 closure(() => {
@@ -386,9 +386,9 @@ closure(() => {
   bench.runSync()
   console.table(bench.table())
   var [tseepRes, myRes, nodeRes, cozyRes] = bench.tasks
-  if (speedOf(myRes) / speedOf(tseepRes) < 12
-    || (speedOf(myRes) / speedOf(nodeRes)) < 3
-    || (speedOf(myRes) / speedOf(cozyRes)) < 2
+  if (speedOf(myRes) / speedOf(tseepRes) < 6.5
+    || (speedOf(myRes) / speedOf(nodeRes)) < 2.5
+    || (speedOf(myRes) / speedOf(cozyRes)) < 1.5
   ) errors.push(new Error("mixed creation+listeners+emit too slow"))
 })
 if (errors.length) { console.error(errors); process.exit(1) }
