@@ -395,7 +395,7 @@ export function testChannel(module: typeof import("@ublitzjs/core/channel")) {
         ch.pub(10); expect([cb1X, cb2X, cb3X]).toEqual([20, 20, 20])
       })
       it("has 'self-deleting' listeners (once)", () => {
-        ch.sub(cb1); function once(i: number) {cb2X+=i; ch.unsubCurrent();console.log("ONCE")}; ch.sub(once)
+        ch.sub(cb1); function once(i: number) {cb2X+=i; ch.unsubCurrent();}; ch.sub(once)
         ch.pub(10); expect([cb1X, cb2X]).toEqual([30, 30])
         ch.pub(10); expect([cb1X, cb2X]).toEqual([40, 30])
       })

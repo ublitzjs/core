@@ -68,6 +68,7 @@ export class Channel<MessageType> {
       cbs[this.i]!(data);
       this.i++
     }
+      this.i = 0
   } 
   clear() { this.cbs = [] }
 }
