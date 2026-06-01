@@ -1,12 +1,11 @@
 {
   "name": "@ublitzjs/core",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "types": "./dist/types/index.d.ts",
   "files": ["dist", "LICENSE"],
   "typesVersions": {
     "*": {
-      ".": ["./dist/types/index.d.ts"],
-      "channel": ["./dist/types/channel.d.ts"]
+      ".": ["./dist/types/index.d.ts"]
     }
   },
   "license": "MIT",
@@ -15,32 +14,26 @@
       "types": "./dist/types/index.d.ts",
       "require": "./dist/cjs/index.js",
       "import": "./dist/esm/index.js"
-    },
-    "./channel": {
-      "types": "./dist/types/channel.d.ts",
-      "require": "./dist/cjs/channel.js",
-      "import": "./dist/esm/channel.js"
     }
   },
   "dependencies": {
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.57.0"
+    "@ublitzjs/channel": "^1.0.0",
+    "@ublitzjs/headers": "^1.0.0",
+    "uwsjs-fork": "github:ublitzjs/uwsjs-fork#v0.0.2"
   },
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
-    "cozyevent": "^1.3.3",
     "@babel/cli": "^7.28.6",
     "@babel/core": "^7.29.0",
     "@babel/plugin-transform-modules-commonjs": "^7.28.6",
-    "@types/node": "^25.2.1",
+    "@types/node": "^25.9.1",
     "@types/ws": "^8.18.1",
-    "@vitest/coverage-v8": "4.0.18",
+    "@vitest/coverage-v8": "^4.1.8",
     "esbuild": "^0.25.12",
-    "tinybench": "^6.0.0",
     "tsd": "^0.33.0",
-    "tseep": "^1.3.1",
-    "vitest": "^4.0.8",
+    "vitest": "^4.1.8",
     "ws": "^8.18.3"
   },
   "scripts": {
@@ -49,9 +42,7 @@
     "build:cjs": "babel dist/esm --out-dir dist/cjs",
     "build:types": "tsc -p tsconfig.types.json",
     "build": "npm run build:types && npm run build:esm && npm run build:cjs",
-    "test:base": "tsd && vitest run tests/index.test.ts --coverage",
-    "test:channel": "node tests/ch-bench.mjs",
-    "test": "bun run test:base && bun run test:channel"
+    "test": "tsd && vitest run tests/index.test.ts --coverage"
   },
   "tsd": {
     "directory": "tests"
@@ -76,8 +67,10 @@
     "headers",
     "codes",
     "development",
-    "fastest pub/sub event emitter",
     "asynchronous code",
     "µBlitz.js"
+  ],
+  "trustedDependencies": [
+    "uwsjs-fork"
   ]
 }

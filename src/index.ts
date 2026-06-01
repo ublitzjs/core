@@ -1,27 +1,17 @@
 "use strict";
-import type { BaseHeaders, lowHeaders, RequiredBaseHeaders } from "./http-headers.js";
-import uWS from "uWebSockets.js";
-import { Buffer } from "node:buffer";
-import { EventEmitter } from "tseep";
-import { Channel } from "./channel.js"
-(uWS as any).DeclarativeResponse.prototype.writeHeaders = function (headers: any) {
-  for (const key in headers) this.writeHeader(key, headers[key]);
-  return this;
-};
+import type {RequiredBaseHeadersT} from "@ublitzjs/headers"
 
-
+import { Channel } from "@ublitzjs/channel"
 import type {
-  CompressOptions,
-  WebSocket,
-  HttpRequest as uwsHttpRequest,
+  HttpRequest,
   TemplatedApp,
   HttpResponse as uwsHttpResponse,
   RecognizedString,
-  us_socket_context_t,
-} from "uWebSockets.js";
+  WebSocketBehavior
+} from "uwsjs-fork"
 
 /**
-* Simple utility proving fast (at least 6+ times) tools to handle "onAborted" using "pub/sub" pattern. Inside uses custom "event emitter", but for one single event. Properties created are "res.aborted (boolean, becomes "true" when res.onAborted fires)" and "res.abortCh (abort channel, imported from @ublitzjs/core/channel). However all callbacks you pass to "abortCh.sub" get "id" property. Don't touch it, ok? It assists with O(1) removal.
+* Simple utility proving fast (at least 6+ times) tools to handle "onAborted" using "pub/sub" pattern. Inside uses custom "event emitter", but for one single event. Properties created are "res.aborted (boolean, becomes "true" when res.onAborted fires)" and "res.abortCh (abort channel, imported from ublitzjs/channel). However all callbacks you pass to "abortCh.sub" get "id" property. Don't touch it, ok? It assists with O(1) removal.
 * @example
 * server.get('/', (res)=>{
 *   res.aborted === undefined // true
@@ -49,27 +39,13 @@ export function regAbort(res: uwsHttpResponse): HttpResponse {
   }) as HttpResponse;
 }
 /**
- * @deprecated this function uses "tseep" dependency, which adds an overhead while gets created and doesn't give just one "abort" channel - too much. Instead use "regAbort", which adds "abortCh" (abort channel, AT LEAST 6 TIMES FASTER)
- * this function adds "res.emitter and res.aborted=false".
- */
-export function registerAbort(res: uwsHttpResponse): HttpResponse {
-  if (typeof res.aborted === "boolean")
-    throw new Error("abort already registered");
-  res.aborted = false;
-  res.emitter = new EventEmitter();
-  return res.onAborted(() => {
-    res.aborted = true;
-    res.emitter.emit("abort");
-  }) as HttpResponse;
-};
-/**
  * An extended version of uWS.App . It provides you with several features:
  * 1) plugin registration (just like in Fastify);
  * 2) "ready" function and _startPromises array (use it to make your code more asynchronous and safe)
  * 3) "route" function for more descriptive adn extensible way of registering handlers
  * 4) "onError" function (mainly used by @ublitzjs/router)
  */
-export interface Server extends TemplatedApp {
+export interface Server<CustomResponse extends HttpResponse = HttpResponse> extends TemplatedApp<CustomResponse> {
   /**
    * It is same as plugins in Fastify -> you register some functionality in separate function
    * @param plugin
@@ -108,22 +84,11 @@ export interface Server extends TemplatedApp {
     opts: routeFNOpts<T> & obj,
     plugins?: ((param: typeof opts, server: this) => void)[]
   ): this;
-  get(pattern: RecognizedString, handler: HttpControllerFn): this;
-  post(pattern: RecognizedString, handler: HttpControllerFn): this;
-  options(pattern: RecognizedString, handler: HttpControllerFn): this;
-  del(pattern: RecognizedString, handler: HttpControllerFn): this;
-  patch(pattern: RecognizedString, handler: HttpControllerFn): this;
-  put(pattern: RecognizedString, handler: HttpControllerFn): this;
-  head(pattern: RecognizedString, handler: HttpControllerFn): this;
-  connect(pattern: RecognizedString, handler: HttpControllerFn): this;
-  trace(pattern: RecognizedString, handler: HttpControllerFn): this;
-  any(pattern: RecognizedString, handler: HttpControllerFn): this;
-  ws<UserData>(pattern: RecognizedString, behavior: DocumentedWSBehavior<UserData>) : this;
 }
 export type routeFNOpts<T extends HttpMethods> = {
   method: T;
   path: RecognizedString;
-  controller: T extends "ws" ? DocumentedWSBehavior<any> : HttpControllerFn;
+  controller: T extends "ws" ? WebSocketBehavior<any> : HttpControllerFn;
 };
 
 /**
@@ -134,32 +99,11 @@ export type routeFNOpts<T extends HttpMethods> = {
 export var closure = <T>(param: () => T): T => param() ;
 /**
  * little more typed response which has:
- * 1) "emitter", that comes from "tseep" package
- * 2) "aborted" flag
- * 3) "finished" flag
- * 4) "collect" function, which comes from original uWS (and isn't documented), but the purpose remains unknown
- * 5) "upgrade" function, though comes from original uWS, must not contain any names, which "DocumentedWS" has (or websocket object). ws.getUserData() return "ws" itself, so setting any data, which overlaps with already existing will impact your workflow. µBlitz.js doesn't add any lsp help here because it will brake "extends uwsHttpResponse" part.
+ * 1) "aborted" flag
+ * 2) "finished" flag
+ * 3) auto-suggesting HttpResponse.writeHeader with ublitzjs/headers
  */
-export interface HttpResponse<UserDataForWS = {}>
-  extends uwsHttpResponse {
-  upgrade<UserData = UserDataForWS>(
-    userData: UserData,
-    secWebSocketKey: RecognizedString,
-    secWebSocketProtocol: RecognizedString,
-    secWebSocketExtensions: RecognizedString,
-    context: us_socket_context_t
-  ): void;
-  /**
-   * This method actually exists in original uWebSockets.js, but is undocumented. I'll put it here for your IDE to be happy
-   */
-  collect: (...any: any[]) => any;
-  /**
-   * @deprecated This is an event emitter, but it is "too much" as just an "onAborted" extension. Don't use "registerAbort", and it won't appear. Instead use "regAbort" and you will get better "res.abortCh"
-   */
-  emitter: EventEmitter<{
-    abort: () => void;
-    [k: symbol]: (...any: any[]) => void;
-  }>;
+export interface HttpResponse<UserDataForWS = {}> extends uwsHttpResponse<UserDataForWS> {
   /**
   * An event channel for onAborted. You can subscribe to it and unsubscribe. "pub/clear" are better to be avoided here
   * server.get('/', (res)=>{
@@ -177,7 +121,7 @@ export interface HttpResponse<UserDataForWS = {}>
   *   }, 1000)
   * })
   * */
-  abortCh: Channel<undefined>
+  abortCh: Channel<void>
   /**
    * changes when res.onAborted fires (you have to use regAbort (not registerAbort) for this)
    */
@@ -200,7 +144,7 @@ export interface HttpResponse<UserDataForWS = {}>
   * // and a faster trick
   * res.writeHeader("Content-Type: text/plain\r\nAccept-Ranges", "bytes")
   * */
-  writeHeader<Key extends keyof RequiredBaseHeaders | Omit<RecognizedString, string> | (string & {})>(key: Key, val: Key extends keyof RequiredBaseHeaders ? RequiredBaseHeaders[Key] : RecognizedString): HttpResponse;
+  writeHeader<Key extends keyof RequiredBaseHeadersT | Omit<RecognizedString, string> | (string & {})>(key: Key, val: Key extends keyof RequiredBaseHeadersT ? RequiredBaseHeadersT[Key] : RecognizedString): this;
 }
 /**This HttpRequest is same as original uWS.HttpRequest, but getHeader method is typed for additional tips
  * @example
@@ -209,9 +153,6 @@ export interface HttpResponse<UserDataForWS = {}>
  * req.getHeader<lowHeaders>("content-type")
  *
  */
-export interface HttpRequest extends uwsHttpRequest {
-  getHeader<T extends RecognizedString = lowHeaders>(a: T): string;
-}
 
 export type HttpControllerFn = (
   res: HttpResponse,
@@ -242,10 +183,10 @@ type MergeObjects<T extends any[]> = T extends [infer First, ...infer Rest]
  * extends uWS.App() or uWS.SSLApp. See interface Server
  * @param app uWS.App()
  */
-export function extendApp<T extends object[]>(
-  app: TemplatedApp,
+export function extendApp<T extends object[], CustomResponse extends HttpResponse = HttpResponse>(
+  app: TemplatedApp<CustomResponse>,
   ...rest: T
-): Server & MergeObjects<T> {
+): Server<CustomResponse> & MergeObjects<T> {
   (app as any).register = function (plugin: any) {
     return plugin(this), this;
   };
@@ -268,160 +209,3 @@ export function extendApp<T extends object[]>(
   for (const extension of rest) Object.assign(app, extension);
   return app as any;
 }
-
-/**
- * @deprecated this conversion to arrayBuffer is not really necessary. You just have Buffer.from(""). Slicing that is rarely needed, and even if it is, that takes 4 lines of code
- */
-export function toAB(data: Buffer | string): ArrayBuffer {
-  var NodeBuf = data instanceof Buffer ? data : Buffer.from(data);
-  return NodeBuf.buffer.slice(
-    NodeBuf.byteOffset,
-    NodeBuf.byteOffset + NodeBuf.byteLength
-  ) as ArrayBuffer;
-}
-
-/**
- * Thanks to "acarstoiu" github user for listing such methods here: "https://github.com/uNetworking/uWebSockets.js/issues/1165".
- */
-type WebSocketFragmentation = {
-  /** Sends the first frame of a multi-frame message. More fragments are expected (possibly none), followed by a last fragment. Care must be taken so as not to interleave these fragments with whole messages (sent with WebSocket.send) or with other messages' fragments.
-   *
-   * Returns 1 for success, 2 for dropped due to backpressure limit, and 0 for built up backpressure that will drain over time. You can check backpressure before or after sending by calling getBufferedAmount().
-   *
-   * Make sure you properly understand the concept of backpressure. Check the backpressure example file.
-   */
-  sendFirstFragment(
-    message: RecognizedString,
-    isBinary?: boolean,
-    compress?: boolean
-  ): number;
-  /** Sends a continuation frame of a multi-frame message. More fragments are expected (possibly none), followed by a last fragment. In terms of sending data, a call to this method must follow a call to WebSocket.sendFirstFragment.
-   *
-   * Returns 1 for success, 2 for dropped due to backpressure limit, and 0 for built up backpressure that will drain over time. You can check backpressure before or after sending by calling getBufferedAmount().
-   *
-   * Make sure you properly understand the concept of backpressure. Check the backpressure example file.
-   */
-  sendFragment(message: RecognizedString, compress?: boolean): number;
-  /** Sends the last continuation frame of a multi-frame message. In terms of sending data, a call to this method must follow a call to WebSocket.sendFirstFragment or WebSocket.sendFragment.
-   *
-   * Returns 1 for success, 2 for dropped due to backpressure limit, and 0 for built up backpressure that will drain over time. You can check backpressure before or after sending by calling getBufferedAmount().
-   *
-   * Make sure you properly understand the concept of backpressure. Check the backpressure example file.
-   */
-  sendLastFragment(message: RecognizedString, compress?: boolean): number;
-};
-export interface DocumentedWS<UserData> extends WebSocket<UserData>, WebSocketFragmentation {
-  /** 
-   * this is an additional property, which saves you from server crashing. In "close" handler you should add "ws.closed = true" and each time you perform any asynchronous work before sending a message run a check "if(ws.closed) { cleanup and quit }"
-   * @example 
-   * import {setTimeout} from "node:timers/promises"
-   * server.ws("/", {
-   *    close(ws){
-   *      ws.closed = true;
-   *    },
-   *    async message(ws){
-   *      await setTimeout(100); // simulate some db query
-   *      if(!ws.closed) ws.send("handled message", false)
-   *    }
-   * })
-  * */
-  closed: boolean;
-  /**
-  * an additional property which might save websocket from overexhaustion
-  * */
-  drainEvent: Promise<void> | undefined;
-  /**
-   * an additional property to monitor queued messages, which can't be sent due to overexhaustion (need to wait for drain).
-   **/
-  queue: number;
-
-}
-export interface DocumentedWSBehavior<UserData> {
-  /** Maximum length of received message. If a client tries to send you a message larger than this, the connection is immediately closed. Defaults to 16 * 1024. */
-  maxPayloadLength?: number;
-  /** Whether or not we should automatically close the socket when a message is dropped due to backpressure. Defaults to false. */
-  closeOnBackpressureLimit?: boolean;
-  /** Maximum number of minutes a WebSocket may be connected before being closed by the server. 0 disables the feature. */
-  maxLifetime?: number;
-  /** Maximum amount of seconds that may pass without sending or getting a message. Connection is closed if this timeout passes. Resolution (granularity) for timeouts are typically 4 seconds, rounded to closest.
-   * Disable by using 0. Defaults to 120.
-   */
-  idleTimeout?: number;
-  /** What permessage-deflate compression to use. uWS.DISABLED, uWS.SHARED_COMPRESSOR or any of the uWS.DEDICATED_COMPRESSOR_xxxKB. Defaults to uWS.DISABLED. */
-  compression?: CompressOptions;
-  /** Maximum length of allowed backpressure per socket when publishing or sending messages. Slow receivers with too high backpressure will be skipped until they catch up or timeout. Defaults to 64 * 1024. */
-  maxBackpressure?: number;
-  /** Whether or not we should automatically send pings to uphold a stable connection given whatever idleTimeout. */
-  sendPingsAutomatically?: boolean;
-  /** Handler for new WebSocket connection. WebSocket is valid from open to close, no errors. */
-  open?: (ws: DocumentedWS<UserData>) => void | Promise<void>;
-  /** Handler for a WebSocket message. Messages are given as ArrayBuffer no matter if they are binary or not. Given ArrayBuffer is valid during the lifetime of this callback (until first await or return) and will be neutered. */
-  message?: (
-    ws: DocumentedWS<UserData>,
-    message: ArrayBuffer,
-    isBinary: boolean
-  ) => void | Promise<void>;
-  /** Handler for a dropped WebSocket message. Messages can be dropped due to specified backpressure settings. Messages are given as ArrayBuffer no matter if they are binary or not. Given ArrayBuffer is valid during the lifetime of this callback (until first await or return) and will be neutered. */
-  dropped?: (
-    ws: DocumentedWS<UserData>,
-    message: ArrayBuffer,
-    isBinary: boolean
-  ) => void | Promise<void>;
-  /** Handler for when WebSocket backpressure drains. Check ws.getBufferedAmount(). Use this to guide / drive your backpressure throttling. */
-  drain?: (ws: DocumentedWS<UserData>) => void;
-  /** Handler for close event, no matter if error, timeout or graceful close. You may not use WebSocket after this event. Do not send on this WebSocket from within here, it is closed. */
-  close?: (
-    ws: DocumentedWS<UserData>,
-    code: number,
-    message: ArrayBuffer
-  ) => void;
-  /** Handler for received ping control message. You do not need to handle this, pong messages are automatically sent as per the standard. */
-  ping?: (ws: DocumentedWS<UserData>, message: ArrayBuffer) => void;
-  /** Handler for received pong control message. */
-  pong?: (ws: DocumentedWS<UserData>, message: ArrayBuffer) => void;
-  /** Handler for subscription changes. */
-  subscription?: (
-    ws: DocumentedWS<UserData>,
-    topic: ArrayBuffer,
-    newCount: number,
-    oldCount: number
-  ) => void;
-  /** Upgrade handler used to intercept HTTP upgrade requests and potentially upgrade to WebSocket.
-   * See UpgradeAsync and UpgradeSync example files.
-   */
-  upgrade?: (
-    res: HttpResponse<UserData>,
-    req: HttpRequest,
-    context: us_socket_context_t
-  ) => void | Promise<void>;
-}
-/**
-* let's believe, that in 20.61.0+ versions we get writeStatus.
-* */
-export type DeclarativeResType = {
-  writeHeader(key: string, value: string): DeclarativeResType;
-  writeQueryValue(key: string): DeclarativeResType;
-  writeHeaderValue(key: string): DeclarativeResType;
-  /**
-   * Write a chunk to the precompiled response
-   */
-  write(value: string): DeclarativeResType;
-  writeParameterValue(key: string): DeclarativeResType;
-  /**
-   * Method to finalize forming a response.
-   */
-  end(value: string): any;
-  writeBody(): DeclarativeResType;
-  /**
-   * additional method from µBlitz.js
-   */
-  writeHeaders<Opts extends BaseHeaders>(headers: Opts): DeclarativeResType;
-};
-/**
- * Almost nothing different from uWS.DeclarativeResponse. The only modification - writeHeaders method (several methods, typescript intellisense)
- */
-export var DeclarativeResponse: {
-  new (): DeclarativeResType;
-} = (uWS as any).DeclarativeResponse;
-export * from "./http-codes.js"
-export * from "./http-headers.js"

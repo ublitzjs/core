@@ -9,11 +9,5 @@ await runTests(["uWebSockets.js"], [
     normalESM: await import("@ublitzjs/core"),
     test: "testIndex",
     name: "index.js"
-  },
-  {
-    normalCJS: require("@ublitzjs/core/channel"),
-    normalESM: await import("@ublitzjs/core/channel"),
-    test: "testChannel",
-    name: "channel.js"
   }
 ])

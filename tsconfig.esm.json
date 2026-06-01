@@ -3,7 +3,9 @@
   "compilerOptions": {
     "target": "es2022",
     "module": "es2022",
-    "outDir": "dist/esm"
+    "rootDir": "src",
+    "outDir": "dist/esm",
+    "types": ["node"]
   },
   "include": ["src"]
 }

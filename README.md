@@ -1,22 +1,24 @@
 ![μBlitz.js](./logo.png)
 <br/>
 
-# μBlitz.js - utilitarian-library for uWebSockets.js
+# μBlitz.js - utilitarian-library for ublitzjs/uwsjs-fork (used to be uWebSockets.js)
 
 On NPM you can find such packages: (with @ublitzjs/ organization)
-
+1. stable:
 - core (THIS repo)
+- headers (fastest parser of "Range" HTTP header)
+- channel (fastest event emitter)
+2. soon (maybe) to become stable
 - logger (colorful console)
 - static (send files)
-- payload (handling POST-like requests)
+- multipart (previously "payload")
 - router (OpenAPI-like router for simple orientation)
 - openapi 
 - preprocess (Code preprocessing + templating framework)
 - asyncapi
-- testing (coming soon)
+- testing (mocking tests, coming soon)
 - auth (coming soon)
-
-The ones having version < 1.0.0 are unstable.
+3. Github-only fork of uWebSockets.js - [uwsjs-fork](https://github.com/ublitzjs/uwsjs-fork)
 
 # Installation
 
@@ -24,23 +26,4 @@ The ones having version < 1.0.0 are unstable.
 npm install "@ublitzjs/core"
 ```
 
-Or with bun. Or whatever.
-
-# Preferences
-
-Supports CJS and ESM in ALL packages
-
 # <a href="./USAGE.md" target="_blank">Go to usage.md</a>
-
-# But why?
-
-It is acclaimed that Express.js, Fastify and other frameworks are built to be very extensible and developer-friendly. It is enough to download needed packages, put them as middlewares, which handle everything behind the scenes, and do your own job. <br>
-
-But the "speed" of creating your app comes from so-called "abstractions". Their versatility is often considered to be an "overkill" as they usually overwhelm the RAM and slow down your app. Most people, however, still prefer "rapid typing" over speed of execution, under which I mean uWebSockets.js (which actually handles websockets AND http requests)<br>
-
-Though it IS performant, it handles only core features. Now there are solutions like "hyper-express", "ultimate-express", "uwebsockets-express", but they are just additional layers simulating "express" behaviour, while hiding the most important (and difficult) aspects of uWS.<br>
-
-This library provides you with utilities but you still operate on the uWebSockets.js. This way server remains optimizable and rapid typing doesn't vanish.
-
-# New feature - "Channel". In other words, "another event emitter".
-Channel proved to be the fastest among tseep, cozyevent and node:events. It is cross-platform and can be used with/without main µBlitz.js ecosystem. Import it using "@ublitzjs/core/channel"
