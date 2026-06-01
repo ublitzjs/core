@@ -1,7 +1,7 @@
 name: Test
 on: 
   push: 
-    branches: [main, events]
+    branches: [main]
 jobs:
   test:
     name: Test
@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
         with:   
-          node-version: 25
+          node-version: 26
       - uses: oven-sh/setup-bun@v2
       - run: bun ci
       - run: bun run trick-tsd && mkdir tmp && bun run build
